@@ -19,6 +19,7 @@ DEFAULT LOGINS (must be changed on first login - enforced automatically):
 
 import json
 import os
+import subprocess
 from functools import wraps
 import requests
 from flask import Flask, jsonify, render_template, request, redirect, url_for, flash
@@ -535,8 +536,38 @@ def admin_remove_floor(building_id, elevator_number, floor_number):
 
 
 # ---- OTHER ADMIN-ONLY ROUTES (devices, Git pull, reboot) ----
-# Add device management / Git-pull / reboot routes here using @admin_required,
-# same pattern as the building/elevator routes above.
+
+# Path to this repo's flask-server folder on the Pi, and the systemd
+# service name that runs it. Update these to match your actual deployment.
+REPO_DIR = "/home/admin/relay_web_poc"
+SERVICE_NAME = "vyzcayne-elevator.service"
+
+
+@app.route("/admin/update-from-git", methods=["POST"])
+@admin_required
+def update_from_git():
+    try:
+        pull_result = subprocess.run(
+            ["git", "-C", REPO_DIR, "pull"],
+            capture_output=True, text=True, timeout=30
+        )
+        if pull_result.returncode != 0:
+            return jsonify({"success": False, "output": pull_result.stderr}), 500
+
+        # The restart kills this very process mid-response on some systems -
+        # that's expected. systemd's Restart=on-failure brings it back up
+        # automatically within a second or two.
+        subprocess.Popen(["sudo", "systemctl", "restart", SERVICE_NAME])
+
+        return jsonify({
+            "success": True,
+            "output": pull_result.stdout,
+            "message": "Pulled changes, restarting service..."
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({"success": False, "error": "git pull timed out"}), 500
+    except FileNotFoundError:
+        return jsonify({"success": False, "error": "git is not installed or not on PATH"}), 500
 
 
 if __name__ == "__main__":
