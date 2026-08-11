@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ building.name }}{% endblock %}
+{% block content %}
+  <h1>{{ building.name }}</h1>
+
+  <form method="POST" style="max-width:400px; margin:0 auto 30px; display:flex; gap:8px;">
+    <input type="text" name="name" value="{{ building.name }}" style="flex:1; padding:10px;
+      border-radius:6px; border:1px solid #444; background:#262626; color:#eee;">
+    <button type="submit" style="padding:10px 16px; border:none; border-radius:8px;
+      background:#2d6cdf; color:white; cursor:pointer;">Rename</button>
+  </form>
+
+  <h3 style="color:#aaa;">Elevators</h3>
+  <div style="max-width:500px; margin:0 auto; display:flex; flex-direction:column; gap:10px;">
+    {% for e in building.elevators %}
+      <div style="background:#262626; border-radius:10px; padding:14px 16px; text-align:left;">
+        <strong>Elevator {{ e.elevator_number }}</strong>
+        <div style="color:#888; font-size:13px; margin:6px 0;">
+          {{ e.num_floors }} floor(s) configured &middot;
+          {% if e.device_ip %}
+            <span style="color:#2fbf4f;">Device: {{ e.device_name or e.device_ip }}</span>
+          {% else %}
+            <span style="color:#e74c3c;">No device assigned</span>
+          {% endif %}
+        </div>
+        <a href="/admin/buildings/{{ building.id }}/elevators/{{ e.elevator_number }}/setup" style="color:#2d6cdf; margin-right:14px;">Configure Floors</a>
+        <a href="/admin/buildings/{{ building.id }}/elevators/{{ e.elevator_number }}/assign-device" style="color:#2d6cdf; margin-right:14px;">Assign Device</a>
+        {% if e.floors %}
+        <a href="/admin/buildings/{{ building.id }}/elevators/{{ e.elevator_number }}/floors" style="color:#2d6cdf;">Manage Floors</a>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <form method="POST" action="/admin/buildings/{{ building.id }}/elevators/new"
+    style="max-width:500px; margin:20px auto 0; display:flex; gap:8px;">
+    <input type="text" name="elevator_number" placeholder="Elevator number (e.g. 7)" required
+      style="flex:1; padding:10px; border-radius:6px; border:1px solid #444; background:#262626; color:#eee;">
+    <button type="submit" style="padding:10px 20px; border:none; border-radius:8px;
+      background:#2d6cdf; color:white; cursor:pointer; font-weight:bold;">+ Add Elevator</button>
+  </form>
+{% endblock %}

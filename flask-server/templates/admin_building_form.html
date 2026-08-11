@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Add Building{% endblock %}
+{% block content %}
+  <h1>Add Building</h1>
+
+  <form method="POST" style="max-width:400px; margin:0 auto; text-align:left;">
+    <label style="color:#aaa; font-size:14px;">Building Name</label>
+    <input type="text" name="name" required style="width:100%; padding:10px; margin:6px 0 16px;
+      border-radius:6px; border:1px solid #444; background:#262626; color:#eee; box-sizing:border-box;">
+
+    <label style="color:#aaa; font-size:14px;">Number of Elevators</label>
+    <input type="number" name="num_elevators" min="1" required style="width:100%; padding:10px; margin:6px 0 16px;
+      border-radius:6px; border:1px solid #444; background:#262626; color:#eee; box-sizing:border-box;">
+
+    <button type="submit" style="width:100%; padding:12px; border:none; border-radius:8px;
+      background:#2d6cdf; color:white; font-size:15px; cursor:pointer;">Create Building</button>
+  </form>
+
+  <p style="color:#888; font-size:13px; max-width:400px; margin:16px auto;">
+    Elevators will be numbered 1 through however many you enter. You can rename elevator numbers
+    afterward - they just need to stay unique within this building.
+  </p>
+{% endblock %}

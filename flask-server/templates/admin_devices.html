@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Devices{% endblock %}
+{% block content %}
+  <h1>Devices</h1>
+
+  <div style="max-width:100%; overflow-x:auto;">
+    <h3 style="color:#aaa;">Assigned Controllers</h3>
+    <table style="width:100%; max-width:900px; margin:0 auto 30px; border-collapse:collapse;">
+      <tr style="color:#aaa; text-align:left; font-size:13px;">
+        <th style="padding:8px;"></th>
+        <th style="padding:8px;">Name</th>
+        <th style="padding:8px;">Building / Elevator</th>
+        <th style="padding:8px;">IP</th>
+        <th style="padding:8px;">Uptime</th>
+        <th style="padding:8px;">Actions</th>
+      </tr>
+      {% for d in assigned %}
+      <tr style="border-top:1px solid #333;">
+        <td style="padding:8px;">
+          <span style="display:inline-block; width:12px; height:12px; border-radius:50%;
+            background:{{ '#2fbf4f' if d.online else '#e74c3c' }};"></span>
+        </td>
+        <td style="padding:8px;">{{ d.name }}</td>
+        <td style="padding:8px;">{{ d.building_name }} - Elevator {{ d.elevator_number }}</td>
+        <td style="padding:8px;">{{ d.ip }}</td>
+        <td style="padding:8px;">{{ (d.status.uptimeSec ~ 's') if d.online and d.status else '-' }}</td>
+        <td style="padding:8px; white-space:nowrap;">
+          <button onclick="reboot('{{ d.ip }}','{{ d.mac }}')" style="padding:6px 10px; border:none;
+            border-radius:6px; background:#7a1f1f; color:white; cursor:pointer; font-size:12px;">Reboot</button>
+          <a href="/devices/network?ip={{ d.ip }}&mac={{ d.mac }}&name={{ d.name }}"
+            style="color:#2d6cdf; font-size:12px; margin-left:8px;">Change IP</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" style="padding:12px; color:#888;">No devices assigned yet.</td></tr>
+      {% endfor %}
+    </table>
+
+    <h3 style="color:#aaa;">
+      Unassigned Devices Found on Network
+      <a href="/devices" style="font-size:13px; color:#2d6cdf; font-weight:normal; margin-left:10px;">Rescan</a>
+    </h3>
+    <table style="width:100%; max-width:900px; margin:0 auto; border-collapse:collapse;">
+      <tr style="color:#aaa; text-align:left; font-size:13px;">
+        <th style="padding:8px;">Name</th>
+        <th style="padding:8px;">IP</th>
+        <th style="padding:8px;">MAC</th>
+        <th style="padding:8px;">Assign to</th>
+      </tr>
+      {% for d in unassigned %}
+      <tr style="border-top:1px solid #333;">
+        <td style="padding:8px;">{{ d.name }}</td>
+        <td style="padding:8px;">{{ d.ip }}</td>
+        <td style="padding:8px;">{{ d.mac }}</td>
+        <td style="padding:8px;">
+          <form style="display:flex; gap:6px;" onsubmit="return goAssign(this, '{{ d.mac }}', '{{ d.ip }}', '{{ d.name }}')">
+            <select style="padding:6px; border-radius:6px; border:1px solid #444; background:#262626; color:#eee;">
+              {% for e in needs_device %}
+                <option value="{{ e.building_id }}|{{ e.elevator_number }}">{{ e.building_name }} - Elevator {{ e.elevator_number }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" style="padding:6px 10px; border:none; border-radius:6px;
+              background:#2d6cdf; color:white; cursor:pointer; font-size:12px;">Assign</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" style="padding:12px; color:#888;">No unassigned devices found. Try Rescan if a device was just powered on.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <script>
+    async function reboot(ip, mac) {
+      if (!confirm('Reboot this device?')) return;
+      const fd = new FormData();
+      fd.append('ip', ip);
+      fd.append('mac', mac);
+      const r = await fetch('/devices/reboot', {method: 'POST', body: fd});
+      const data = await r.json();
+      alert(data.success ? 'Reboot command sent.' : 'Failed to reach device.');
+    }
+
+    function goAssign(form, mac, ip, name) {
+      const select = form.querySelector('select');
+      const [buildingId, elevatorNumber] = select.value.split('|');
+      window.location.href = `/admin/buildings/${buildingId}/elevators/${elevatorNumber}/assign-device?mac=${encodeURIComponent(mac)}&ip=${encodeURIComponent(ip)}&name=${encodeURIComponent(name)}`;
+      return false;
+    }
+  </script>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Manage Floors - Elevator {{ elevator.elevator_number }}{% endblock %}
+{% block content %}
+  <h1>Floors - Elevator {{ elevator.elevator_number }}</h1>
+  <p style="color:#888;">{{ building.name }}</p>
+
+  <div style="max-width:600px; margin:0 auto; text-align:left;">
+    {% for floor in elevator.floors %}
+      <details style="background:#262626; border-radius:8px; margin-bottom:10px; padding:12px 16px;">
+        <summary style="cursor:pointer; font-weight:bold;">
+          {{ floor.label }}
+          {% if not floor.enabled %}<span style="color:#e74c3c; font-size:12px;"> (disabled)</span>{% endif %}
+          {% if floor.always_available %}<span style="color:#2fbf4f; font-size:12px;"> (always available)</span>{% endif %}
+          {% if floor.schedule %}<span style="color:#aaa; font-size:12px;"> (scheduled)</span>{% endif %}
+        </summary>
+
+        <form method="POST" action="/admin/buildings/{{ building.id }}/elevators/{{ elevator.elevator_number }}/floors/{{ floor.number }}/update"
+          style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
+
+          <label style="color:#aaa; font-size:14px;">Label</label>
+          <input type="text" name="label" value="{{ floor.label }}"
+            style="padding:8px; border-radius:6px; border:1px solid #444; background:#1a1a1a; color:#eee;">
+
+          <label style="display:flex; align-items:center; gap:8px; font-size:14px;">
+            <input type="checkbox" name="enabled" {{ 'checked' if floor.enabled else '' }}>
+            Enabled
+          </label>
+
+          <label style="display:flex; align-items:center; gap:8px; font-size:14px;">
+            <input type="checkbox" name="always_available" {{ 'checked' if floor.always_available else '' }}>
+            Always available (ignores schedule below)
+          </label>
+
+          <label style="display:flex; align-items:center; gap:8px; font-size:14px;">
+            <input type="checkbox" name="schedule_enabled" {{ 'checked' if floor.schedule else '' }}>
+            Restrict to a schedule
+          </label>
+
+          <div style="padding-left:20px; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              {% for day in day_names %}
+                <label style="font-size:13px;">
+                  <input type="checkbox" name="days" value="{{ day }}"
+                    {{ 'checked' if floor.schedule and day in floor.schedule.days else '' }}>
+                  {{ day }}
+                </label>
+              {% endfor %}
+            </div>
+            <div style="display:flex; gap:10px;">
+              <input type="time" name="start_time" value="{{ floor.schedule.start if floor.schedule else '' }}"
+                style="padding:6px; border-radius:6px; border:1px solid #444; background:#1a1a1a; color:#eee;">
+              <span style="color:#888;">to</span>
+              <input type="time" name="end_time" value="{{ floor.schedule.end if floor.schedule else '' }}"
+                style="padding:6px; border-radius:6px; border:1px solid #444; background:#1a1a1a; color:#eee;">
+            </div>
+          </div>
+
+          <button type="submit" style="padding:10px; border:none; border-radius:6px;
+            background:#2d6cdf; color:white; cursor:pointer;">Save</button>
+        </form>
+
+        <form method="POST" action="/admin/buildings/{{ building.id }}/elevators/{{ elevator.elevator_number }}/floors/{{ floor.number }}/remove"
+          onsubmit="return confirm('Remove this floor?');" style="margin-top:8px;">
+          <button type="submit" style="padding:8px 12px; border:none; border-radius:6px;
+            background:#7a1f1f; color:white; cursor:pointer; font-size:13px;">Remove Floor</button>
+        </form>
+      </details>
+    {% endfor %}
+  </div>
+
+  <form method="POST" action="/admin/buildings/{{ building.id }}/elevators/{{ elevator.elevator_number }}/floors/add"
+    style="max-width:600px; margin:20px auto 0; display:flex; gap:8px;">
+    <input type="text" name="label" placeholder="Custom floor/door name (e.g. Lobby, PH)" required
+      style="flex:1; padding:10px; border-radius:6px; border:1px solid #444; background:#262626; color:#eee;">
+    <button type="submit" style="padding:10px 20px; border:none; border-radius:8px;
+      background:#2d6cdf; color:white; cursor:pointer; font-weight:bold;">+ Add Floor</button>
+  </form>
+
+  <p style="max-width:600px; margin:20px auto;">
+    <a href="/admin/buildings/{{ building.id }}" style="color:#2d6cdf;">&larr; Back to {{ building.name }}</a>
+  </p>
+{% endblock %}

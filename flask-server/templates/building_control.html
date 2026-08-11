@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}{{ building.name }}{% endblock %}
+
+{% block content %}
+  <h1>{{ building.name }}</h1>
+
+  {% if all_buildings|length > 1 %}
+  <div style="margin-bottom:20px;">
+    {% for b in all_buildings %}
+      <a href="/building/{{ b.id }}" style="color:{{ '#2fbf4f' if b.id == building.id else '#2d6cdf' }}; margin:0 8px;">{{ b.name }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div id="elevatorGrid" style="display:flex; justify-content:center; gap:16px; flex-wrap:wrap; max-width:1200px; margin:0 auto;">
+    {% for elevator in building.elevators %}
+      <div class="elevator-col">
+        <div class="elevator-col-title">Elevator {{ elevator.elevator_number }}</div>
+        {% if not elevator.device_ip %}
+          <div style="color:#e74c3c; font-size:12px;">No device assigned</div>
+        {% endif %}
+        {% for floor in elevator.floors %}
+          <button
+            class="floor-btn {{ '' if floor.available_now else 'disabled' }}"
+            {% if floor.available_now %}
+            onclick="activateRelay('{{ building.id }}', '{{ elevator.elevator_number }}', {{ floor.number }}, '{{ floor.label }}', this)"
+            {% else %}
+            disabled title="Not currently available"
+            {% endif %}
+          >{{ floor.label }}</button>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p style="color:#888;">No elevators configured for this building yet.</p>
+    {% endfor %}
+  </div>
+  <div id="status"></div>
+
+  <style>
+    .elevator-col {
+      background: #262626;
+      border-radius: 10px;
+      padding: 16px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 110px;
+    }
+    .elevator-col-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #aaa;
+      margin-bottom: 6px;
+    }
+    button.floor-btn {
+      padding: 10px 6px;
+      font-size: 13px;
+      border: none;
+      border-radius: 6px;
+      background: #2d6cdf;
+      color: white;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      white-space: nowrap;
+    }
+    button.floor-btn:hover {
+      background: #3d7cef;
+    }
+    button.floor-btn:active {
+      transform: scale(0.96);
+    }
+    button.floor-btn.active {
+      background: #2fbf4f;
+    }
+    button.floor-btn.disabled {
+      background: #3a3a3a;
+      color: #777;
+      cursor: not-allowed;
+    }
+  </style>
+
+  <script>
+    const HOLD_MS = {{ hold_ms }};
+    const statusEl = document.getElementById('status');
+
+    async function activateRelay(buildingId, elevatorNumber, floorNumber, label, btnEl) {
+      btnEl.classList.add('active');
+      statusEl.textContent = `Sending: ${label} (Elevator ${elevatorNumber})...`;
+
+      try {
+        const response = await fetch(`/activate/${buildingId}/${elevatorNumber}/${floorNumber}/${HOLD_MS}`);
+        const data = await response.json();
+
+        if (data.success) {
+          statusEl.textContent = `${label}: ${data.message}`;
+        } else {
+          statusEl.textContent = `Error: ${data.message || data.error}`;
+        }
+      } catch (err) {
+        statusEl.textContent = `Request failed: ${err}`;
+      }
+
+      setTimeout(() => btnEl.classList.remove('active'), HOLD_MS);
+    }
+  </script>
+{% endblock %}

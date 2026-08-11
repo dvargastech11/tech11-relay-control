@@ -1,0 +1,13 @@
+# Runtime data - generated on first run, contains site-specific config and password hashes
+flask-server/users.json
+flask-server/buildings.json
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Arduino build artifacts
+*.bin
+build/

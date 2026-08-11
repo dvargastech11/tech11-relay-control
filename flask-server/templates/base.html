@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Tech 11 Relay Control System{% endblock %}</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #1a1a1a;
+      color: #eee;
+      text-align: center;
+      padding: 20px 20px 60px;
+      margin: 0;
+    }
+    nav {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      padding: 16px;
+      background: #262626;
+      border-radius: 10px;
+      max-width: 700px;
+      margin: 0 auto 30px;
+      flex-wrap: wrap;
+    }
+    nav a {
+      color: #eee;
+      text-decoration: none;
+      padding: 10px 18px;
+      border-radius: 6px;
+      background: #2d6cdf;
+      font-size: 14px;
+      font-weight: bold;
+      transition: background 0.15s;
+    }
+    nav a:hover {
+      background: #3d7cef;
+    }
+    nav a.active {
+      background: #2fbf4f;
+    }
+    h1 {
+      margin: 10px 0 30px;
+      font-size: 26px;
+    }
+    #status {
+      margin-top: 30px;
+      font-size: 14px;
+      color: #aaa;
+      min-height: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="/" class="{{ 'active' if active_page == 'home' else '' }}">Home</a>
+    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+    <a href="/admin/buildings" class="{{ 'active' if active_page == 'admin_buildings' else '' }}">Manage Buildings</a>
+    <a href="/devices" class="{{ 'active' if active_page == 'devices' else '' }}">Devices</a>
+    {% endif %}
+  </nav>
+
+  {% if current_user.is_authenticated %}
+  <p style="color:#666; font-size:12px; margin-top:-20px; margin-bottom:20px;">
+    Logged in as {{ current_user.id }} ({{ current_user.role }}) &middot; <a href="/logout" style="color:#888;">Log out</a>
+  </p>
+  {% endif %}
+
+  {% block content %}{% endblock %}
+
+</body>
+</html>

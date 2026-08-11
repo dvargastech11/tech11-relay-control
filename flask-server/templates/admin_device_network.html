@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Change IP - {{ name }}{% endblock %}
+{% block content %}
+  <h1>Network Settings - {{ name }}</h1>
+  <p style="color:{{ '#2fbf4f' if online else '#e74c3c' }};">
+    {{ 'Device is online' if online else 'Device is not responding - settings can still be sent but may not apply until it reconnects.' }}
+  </p>
+
+  <form method="POST" style="max-width:400px; margin:0 auto; text-align:left;">
+    <input type="hidden" name="ip" value="{{ ip }}">
+    <input type="hidden" name="mac" value="{{ mac }}">
+
+    <label style="color:#aaa; font-size:14px;">Device Name</label>
+    <input type="text" name="devname" value="{{ name }}"
+      style="width:100%; padding:10px; margin:6px 0 16px; border-radius:6px; border:1px solid #444;
+      background:#262626; color:#eee; box-sizing:border-box;">
+
+    <label style="display:block; margin-bottom:8px;">
+      <input type="radio" name="mode" value="dhcp" onclick="toggleMode(true)"> DHCP (automatic)
+    </label>
+    <label style="display:block; margin-bottom:16px;">
+      <input type="radio" name="mode" value="static" checked onclick="toggleMode(false)"> Static IP
+    </label>
+
+    <div id="staticFields">
+      <label style="color:#aaa; font-size:14px;">New IP Address</label>
+      <input type="text" name="new_ip" value="{{ status.get('ip') if status else ip }}" placeholder="192.168.1.50"
+        style="width:100%; padding:10px; margin:6px 0 16px; border-radius:6px; border:1px solid #444;
+        background:#262626; color:#eee; box-sizing:border-box;">
+
+      <label style="color:#aaa; font-size:14px;">Gateway</label>
+      <input type="text" name="gw" value="{{ status.get('gateway') if status else '' }}" placeholder="192.168.1.1"
+        style="width:100%; padding:10px; margin:6px 0 16px; border-radius:6px; border:1px solid #444;
+        background:#262626; color:#eee; box-sizing:border-box;">
+
+      <label style="color:#aaa; font-size:14px;">Subnet Mask</label>
+      <input type="text" name="sn" value="{{ status.get('subnet') if status else '255.255.255.0' }}"
+        style="width:100%; padding:10px; margin:6px 0 16px; border-radius:6px; border:1px solid #444;
+        background:#262626; color:#eee; box-sizing:border-box;">
+    </div>
+
+    <button type="submit" style="width:100%; padding:12px; border:none; border-radius:8px;
+      background:#2d6cdf; color:white; font-size:15px; cursor:pointer;">Save &amp; Reboot Device</button>
+  </form>
+
+  <p style="color:#e74c3c; max-width:400px; margin:16px auto; font-size:13px;">
+    Warning: changing the IP or switching to DHCP will change how this device is reached.
+    Refresh the Devices page after it reboots to confirm its new address.
+  </p>
+
+  <p style="max-width:400px; margin:0 auto;">
+    <a href="/devices" style="color:#2d6cdf;">&larr; Back to Devices</a>
+  </p>
+
+  <script>
+    function toggleMode(dhcp) {
+      document.getElementById('staticFields').style.display = dhcp ? 'none' : 'block';
+    }
+  </script>
+{% endblock %}

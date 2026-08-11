@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Configure Elevator {{ elevator.elevator_number }}{% endblock %}
+{% block content %}
+  <h1>Elevator {{ elevator.elevator_number }} - {{ building.name }}</h1>
+
+  <form method="POST" style="max-width:400px; margin:0 auto; text-align:left;">
+    <label style="color:#aaa; font-size:14px;">Number of Floors</label>
+    <input type="number" name="num_floors" min="1" value="{{ elevator.num_floors or '' }}" required
+      style="width:100%; padding:10px; margin:6px 0 16px; border-radius:6px; border:1px solid #444;
+      background:#262626; color:#eee; box-sizing:border-box;">
+
+    <label style="display:flex; align-items:center; gap:8px; color:#aaa; font-size:14px; margin-bottom:20px;">
+      <input type="checkbox" name="skip_13th" {{ 'checked' if elevator.skip_13th else '' }}>
+      Skip 13th floor (standard for US buildings)
+    </label>
+
+    <button type="submit" style="width:100%; padding:12px; border:none; border-radius:8px;
+      background:#2d6cdf; color:white; font-size:15px; cursor:pointer;">Save Floor Configuration</button>
+  </form>
+
+  <p style="color:#888; font-size:13px; max-width:400px; margin:16px auto;">
+    This generates floors 2 through {{ '(num floors + 1, skipping 13)' }} automatically.
+    Use "Manage Floors" afterward to disable individual floors, mark a floor as always
+    available, add custom-named floors/doors (e.g. "Lobby"), or set availability schedules.
+  </p>
+
+  <p style="max-width:400px; margin:0 auto;">
+    <a href="/admin/buildings/{{ building.id }}" style="color:#2d6cdf;">&larr; Back to {{ building.name }}</a>
+  </p>
+{% endblock %}
