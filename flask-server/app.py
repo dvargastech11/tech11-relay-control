@@ -162,23 +162,29 @@ REQUEST_TIMEOUT_SEC = 3
 HOLD_MS = 5000  # fixed 5 second hold for all floor buttons
 
 
-def send_relay_command(device_ip, relay_num, duration_ms):
+def send_relay_command(device_ip, device_mac, relay_num, duration_ms):
     """Send an HTTP activate command to an elevator's assigned ESP32 module.
 
     NOTE: current module firmware expects POST JSON on /trigger, e.g.
         POST http://<ip>/trigger
         Body: {"relay": 1}
-    It currently ignores duration_ms and always holds for a hardcoded 5000ms
-    server-side.
+    Authenticated via the MAC-derived API key (X-API-Key header), same
+    scheme used by devices.py for status/reboot/network calls. It
+    currently ignores duration_ms and always holds for a hardcoded
+    5000ms server-side.
     """
     if not device_ip:
         return False, "No device assigned to this elevator"
+    if not device_mac:
+        return False, "No MAC address on file for this elevator's device - re-assign it on the Assign Device page"
 
     url = f"http://{device_ip}/trigger"
     payload = {"relay": relay_num}
+    api_key = devsvc.compute_device_api_key(device_mac)
+    headers = {"X-API-Key": api_key}
 
     try:
-        resp = requests.post(url, json=payload, timeout=REQUEST_TIMEOUT_SEC)
+        resp = requests.post(url, json=payload, headers=headers, timeout=REQUEST_TIMEOUT_SEC)
         return resp.status_code == 200, resp.text
     except requests.RequestException as e:
         return False, f"Module unreachable: {e}"
@@ -243,7 +249,47 @@ def activate(building_id, elevator_number, floor_number, duration_ms):
     # channels are wired up in sequence.
     relay_num = elevator["floors"].index(floor) + 1
 
-    success, message = send_relay_command(elevator["device_ip"], relay_num, duration_ms)
+    success, message = send_relay_command(elevator["device_ip"], elevator.get("device_mac"), relay_num, duration_ms)
+    return jsonify({"success": success, "message": message})
+
+
+# ---- ADMIN: TEST BUTTONS (raw relay test, bypasses floor/schedule config) ----
+
+@app.route("/admin/test-buttons")
+@admin_required
+def admin_test_buttons():
+    data = bstore.load_data()
+    devices_list = []
+    for building in data["buildings"]:
+        for elevator in building["elevators"]:
+            if elevator.get("device_ip"):
+                devices_list.append({
+                    "building_id": building["id"],
+                    "building_name": building["name"],
+                    "elevator_number": elevator["elevator_number"],
+                    "device_name": elevator.get("device_name") or elevator["device_ip"],
+                    "device_ip": elevator["device_ip"],
+                    "device_mac": elevator.get("device_mac"),
+                    "num_relays": len(elevator["floors"]) if elevator["floors"] else elevator.get("num_floors", 0),
+                })
+    return render_template("admin_test_buttons.html", active_page="test_buttons", devices=devices_list)
+
+
+@app.route("/admin/test-buttons/fire", methods=["POST"])
+@admin_required
+def admin_test_buttons_fire():
+    device_ip = request.form.get("device_ip")
+    device_mac = request.form.get("device_mac")
+    try:
+        relay_num = int(request.form.get("relay_num", "0"))
+        duration_ms = int(request.form.get("duration_ms", "5000"))
+    except ValueError:
+        return jsonify({"success": False, "error": "Invalid relay number or duration"}), 400
+
+    if relay_num < 1:
+        return jsonify({"success": False, "error": "Relay number must be 1 or greater"}), 400
+
+    success, message = send_relay_command(device_ip, device_mac, relay_num, duration_ms)
     return jsonify({"success": success, "message": message})
 
 

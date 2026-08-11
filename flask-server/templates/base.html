@@ -57,6 +57,7 @@
     <a href="/" class="{{ 'active' if active_page == 'home' else '' }}">Home</a>
     {% if current_user.is_authenticated and current_user.role == 'admin' %}
     <a href="/admin/buildings" class="{{ 'active' if active_page == 'admin_buildings' else '' }}">Manage Buildings</a>
+    <a href="/admin/test-buttons" class="{{ 'active' if active_page == 'test_buttons' else '' }}">Test Buttons</a>
     <a href="/devices" class="{{ 'active' if active_page == 'devices' else '' }}">Devices</a>
     {% endif %}
   </nav>
