@@ -165,6 +165,93 @@ def change_password():
     )
 
 
+def _count_admins():
+    return sum(1 for u in USERS.values() if u["role"] == "admin")
+
+
+@app.route("/admin/users")
+@admin_required
+def admin_users():
+    users_list = [
+        {"username": username, "role": rec["role"], "must_change_password": rec["must_change_password"]}
+        for username, rec in USERS.items()
+    ]
+    return render_template("admin_users.html", active_page="admin_users", users=users_list)
+
+
+@app.route("/admin/users/new", methods=["POST"])
+@admin_required
+def admin_users_new():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
+    role = request.form.get("role", "operator")
+
+    if not username or not password:
+        flash("Username and password are both required.")
+    elif username in USERS:
+        flash(f"User '{username}' already exists.")
+    elif len(password) < 8:
+        flash("Password must be at least 8 characters.")
+    elif role not in ("admin", "operator"):
+        flash("Invalid role.")
+    else:
+        USERS[username] = {
+            "password_hash": generate_password_hash(password),
+            "role": role,
+            "must_change_password": True,
+        }
+        save_users(USERS)
+        flash(f"User '{username}' created. They'll be prompted to change their password on first login.")
+
+    return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/users/<username>/update", methods=["POST"])
+@admin_required
+def admin_users_update(username):
+    if username not in USERS:
+        flash("User not found.")
+        return redirect(url_for("admin_users"))
+
+    new_role = request.form.get("role")
+    new_password = request.form.get("new_password", "").strip()
+
+    if new_role and new_role != USERS[username]["role"]:
+        if USERS[username]["role"] == "admin" and new_role != "admin" and _count_admins() <= 1:
+            flash("Cannot change the last remaining admin to operator - at least one admin must exist.")
+            return redirect(url_for("admin_users"))
+        USERS[username]["role"] = new_role
+
+    if new_password:
+        if len(new_password) < 8:
+            flash("New password must be at least 8 characters - role change (if any) was still applied.")
+            save_users(USERS)
+            return redirect(url_for("admin_users"))
+        USERS[username]["password_hash"] = generate_password_hash(new_password)
+        USERS[username]["must_change_password"] = True
+
+    save_users(USERS)
+    flash(f"User '{username}' updated.")
+    return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/users/<username>/delete", methods=["POST"])
+@admin_required
+def admin_users_delete(username):
+    if username not in USERS:
+        flash("User not found.")
+    elif username == current_user.id:
+        flash("You can't delete your own account while logged in as it.")
+    elif USERS[username]["role"] == "admin" and _count_admins() <= 1:
+        flash("Cannot delete the last remaining admin.")
+    else:
+        del USERS[username]
+        save_users(USERS)
+        flash(f"User '{username}' deleted.")
+
+    return redirect(url_for("admin_users"))
+
+
 import building_store as bstore
 import devices as devsvc
 
