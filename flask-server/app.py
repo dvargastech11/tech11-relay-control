@@ -19,6 +19,7 @@ DEFAULT LOGINS (must be changed on first login - enforced automatically):
 
 import json
 import os
+import shutil
 import subprocess
 from functools import wraps
 import requests
@@ -37,7 +38,11 @@ login_manager.init_app(app)
 login_manager.login_view = "login"
 
 # ---- USER STORE (persisted to disk so password changes survive restarts) ----
-USERS_FILE = "users.json"
+# Stored OUTSIDE the git repo folder, same reasoning as buildings.json in
+# building_store.py - a `git pull` can never touch this location.
+_DATA_DIR = os.path.expanduser("~/tech11-data")
+USERS_FILE = os.path.join(_DATA_DIR, "users.json")
+_OLD_USERS_FILE = "users.json"  # previous in-repo location, migrated once below
 
 DEFAULT_USERS = {
     "admin": {
@@ -54,6 +59,10 @@ DEFAULT_USERS = {
 
 
 def load_users():
+    os.makedirs(_DATA_DIR, exist_ok=True)
+    if not os.path.exists(USERS_FILE) and os.path.exists(_OLD_USERS_FILE):
+        shutil.copy2(_OLD_USERS_FILE, USERS_FILE)  # one-time migration
+
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, "r") as f:
             return json.load(f)
@@ -62,6 +71,7 @@ def load_users():
 
 
 def save_users(users_dict):
+    os.makedirs(_DATA_DIR, exist_ok=True)
     with open(USERS_FILE, "w") as f:
         json.dump(users_dict, f, indent=2)
 

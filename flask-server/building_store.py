@@ -1,8 +1,10 @@
 """
 Building / Elevator / Floor configuration store.
 ---------------------------------------------------
-Persists to buildings.json. Replaces the old hardcoded NT/ST tower
-structure with a fully configurable hierarchy:
+Persists to buildings.json OUTSIDE the git repo folder (in ~/tech11-data/),
+so a `git pull` on the repo can never overwrite or delete it - even if the
+file was accidentally committed at some point in the past, since it now
+lives entirely outside any directory git touches.
 
 Building -> Elevators (unique elevator_number per building) -> Floors
     Each floor: enabled, always_available, schedule (optional)
@@ -11,9 +13,18 @@ Building -> Elevators (unique elevator_number per building) -> Floors
 
 import json
 import os
+import shutil
 from datetime import datetime
 
-DATA_FILE = "buildings.json"
+# Persistent data lives outside the repo folder entirely - git operations
+# (pull, checkout, reset) only ever touch files inside the repo directory,
+# so this location is safe from being overwritten or wiped by a code update.
+DATA_DIR = os.path.expanduser("~/tech11-data")
+DATA_FILE = os.path.join(DATA_DIR, "buildings.json")
+
+# Old location (inside the repo folder) used before this fix - if data
+# exists there and nothing exists yet at the new location, migrate it once.
+_OLD_DATA_FILE = "buildings.json"
 
 DAY_NAMES = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
 
@@ -30,7 +41,14 @@ def _default_data():
     }
 
 
+def _migrate_old_data_if_needed():
+    os.makedirs(DATA_DIR, exist_ok=True)
+    if not os.path.exists(DATA_FILE) and os.path.exists(_OLD_DATA_FILE):
+        shutil.copy2(_OLD_DATA_FILE, DATA_FILE)
+
+
 def load_data():
+    _migrate_old_data_if_needed()
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as f:
             return json.load(f)
