@@ -585,7 +585,7 @@ def admin_remove_floor(building_id, elevator_number, floor_number):
 
 # Path to this repo's flask-server folder on the Pi, and the systemd
 # service name that runs it. Update these to match your actual deployment.
-REPO_DIR = "/home/admin/relay_web_poc"
+REPO_DIR = "/home/admin/tech11-relay-control"
 SERVICE_NAME = "vyzcayne-elevator.service"
 
 
