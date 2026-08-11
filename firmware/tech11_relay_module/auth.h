@@ -15,5 +15,6 @@ void saveAuthConfig(String newPassword, bool changed);
 bool checkAuth();
 bool checkForcedPasswordChange();
 bool checkApiKey();
+bool checkApiKeySilent();
 
 #endif

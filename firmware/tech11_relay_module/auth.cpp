@@ -72,3 +72,10 @@ bool checkApiKey() {
   }
   return true;
 }
+
+bool checkApiKeySilent() {
+  // Same check as checkApiKey(), but doesn't send a response itself - needed
+  // when checking auth mid-multipart-upload, where sending a response early
+  // would conflict with the still-streaming request body.
+  return server.hasHeader("X-API-Key") && server.header("X-API-Key") == deviceApiKey;
+}

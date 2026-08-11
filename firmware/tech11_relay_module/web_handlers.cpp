@@ -234,6 +234,39 @@ static void handleUpdateResult() {
   }
 }
 
+// ---- Pi-initiated firmware push (API key, not the human admin login) ----
+// Lets the Pi push a compiled .bin directly, e.g. after a "Push Update"
+// action in the Devices page, without needing an admin browser session.
+static bool apiUpdatePushAuthorized = false;
+
+static void handleApiUpdatePushUpload() {
+  HTTPUpload& upload = server.upload();
+  if (upload.status == UPLOAD_FILE_START) {
+    apiUpdatePushAuthorized = checkApiKeySilent();
+    if (apiUpdatePushAuthorized) {
+      Update.begin(UPDATE_SIZE_UNKNOWN);
+    }
+  } else if (upload.status == UPLOAD_FILE_WRITE) {
+    if (apiUpdatePushAuthorized) Update.write(upload.buf, upload.currentSize);
+  } else if (upload.status == UPLOAD_FILE_END) {
+    if (apiUpdatePushAuthorized) Update.end(true);
+  }
+}
+
+static void handleApiUpdatePushResult() {
+  if (!apiUpdatePushAuthorized) {
+    server.send(401, "application/json", "{\"error\":\"Invalid or missing API key\"}");
+    return;
+  }
+  if (Update.hasError()) {
+    server.send(200, "application/json", "{\"success\":false,\"error\":\"Update failed\"}");
+    return;
+  }
+  server.send(200, "application/json", "{\"success\":true,\"message\":\"Update applied, rebooting\"}");
+  delay(1000);
+  ESP.restart();
+}
+
 static void handleCheckUpdate() {
   if (!checkAuth()) return;
   checkForUpdates(false);
@@ -418,6 +451,7 @@ void registerWebHandlers() {
   server.on("/logs", HTTP_GET, handleLogs);
   server.on("/update", HTTP_GET, handleUpdatePage);
   server.on("/update", HTTP_POST, handleUpdateResult, handleUpdateUpload);
+  server.on("/update/push", HTTP_POST, handleApiUpdatePushResult, handleApiUpdatePushUpload);
   server.on("/update/check", HTTP_GET, handleCheckUpdate);
   server.on("/update/apply", HTTP_POST, handleApplyUpdate);
   server.on("/update/rollback", HTTP_POST, handleRollback);

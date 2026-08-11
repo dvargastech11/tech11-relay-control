@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Push Firmware Update{% endblock %}
+{% block content %}
+  <h1>Push Firmware Update</h1>
+  <p style="color:#888; max-width:500px; margin:0 auto 20px;">
+    Uploads a compiled .bin (Arduino IDE: Sketch &rarr; Export Compiled Binary) and pushes it
+    directly to the selected device over the network. The device reboots automatically on success.
+  </p>
+
+  <form method="POST" enctype="multipart/form-data" style="max-width:450px; margin:0 auto; text-align:left;">
+    <label style="color:#aaa; font-size:14px;">Target Device</label>
+    <select name="ip_mac_select" onchange="fillHidden(this)"
+      style="width:100%; padding:10px; margin:6px 0 16px; border-radius:6px; border:1px solid #444;
+      background:#262626; color:#eee; box-sizing:border-box;">
+      <option value="">-- Select a device --</option>
+      {% for d in devices %}
+        <option value="{{ d.ip }}|{{ d.mac or '' }}">{{ d.label }}</option>
+      {% endfor %}
+    </select>
+    <input type="hidden" name="ip" id="ip-field">
+    <input type="hidden" name="mac" id="mac-field">
+
+    <label style="color:#aaa; font-size:14px;">Firmware File (.bin)</label>
+    <input type="file" name="firmware" accept=".bin" required
+      style="width:100%; padding:8px; margin:6px 0 16px; color:#eee;">
+
+    <button type="submit" style="width:100%; padding:12px; border:none; border-radius:8px;
+      background:#2d6cdf; color:white; font-size:15px; cursor:pointer;">Push Update</button>
+  </form>
+
+  <p style="color:#e74c3c; max-width:450px; margin:16px auto; font-size:13px;">
+    Warning: pushing the wrong .bin (or one built for a different board) can leave the device
+    unable to boot. Double-check the file before pushing to hardware controlling live relays.
+  </p>
+
+  <p style="max-width:450px; margin:0 auto;">
+    <a href="/devices" style="color:#2d6cdf;">&larr; Back to Devices</a>
+  </p>
+
+  <script>
+    function fillHidden(select) {
+      const [ip, mac] = select.value.split('|');
+      document.getElementById('ip-field').value = ip || '';
+      document.getElementById('mac-field').value = mac || '';
+    }
+  </script>
+{% endblock %}

@@ -145,3 +145,24 @@ def update_network(ip, mac, payload):
         return resp.status_code == 200
     except requests.RequestException:
         return False
+
+
+def push_firmware(ip, mac, firmware_bytes, timeout=60):
+    """Pushes a compiled .bin directly to a device's /update/push endpoint.
+    This is separate from the device's own GitHub self-update check - this
+    is initiated FROM the Pi on demand, e.g. after building new firmware.
+    Returns (success: bool, message: str)."""
+    if not ip or not mac:
+        return False, "Missing IP or MAC for this device"
+
+    api_key = compute_device_api_key(mac)
+    try:
+        resp = requests.post(
+            f"http://{ip}/update/push",
+            files={"firmware": ("firmware.bin", firmware_bytes, "application/octet-stream")},
+            headers={"X-API-Key": api_key},
+            timeout=timeout,  # flashing takes longer than a normal request
+        )
+        return resp.status_code == 200, resp.text
+    except requests.RequestException as e:
+        return False, f"Device unreachable: {e}"

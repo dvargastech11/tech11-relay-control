@@ -374,6 +374,41 @@ def devices_page():
     )
 
 
+@app.route("/devices/push-firmware", methods=["GET", "POST"])
+@admin_required
+def devices_push_firmware():
+    data = bstore.load_data()
+    all_devices = []
+    for building in data["buildings"]:
+        for elevator in building["elevators"]:
+            if elevator.get("device_ip"):
+                all_devices.append({
+                    "label": f"{building['name']} - Elevator {elevator['elevator_number']} "
+                             f"({elevator.get('device_name') or elevator['device_ip']})",
+                    "ip": elevator["device_ip"],
+                    "mac": elevator.get("device_mac"),
+                })
+
+    if request.method == "POST":
+        ip = request.form.get("ip")
+        mac = request.form.get("mac")
+        firmware_file = request.files.get("firmware")
+
+        if not firmware_file or firmware_file.filename == "":
+            flash("Select a .bin file to push.")
+            return redirect(url_for("devices_push_firmware"))
+
+        firmware_bytes = firmware_file.read()
+        success, message = devsvc.push_firmware(ip, mac, firmware_bytes)
+
+        flash(f"Push {'succeeded' if success else 'failed'}: {message}")
+        return redirect(url_for("devices_push_firmware"))
+
+    return render_template(
+        "admin_push_firmware.html", active_page="devices", devices=all_devices,
+    )
+
+
 @app.route("/devices/reboot", methods=["POST"])
 @admin_required
 def devices_reboot():
