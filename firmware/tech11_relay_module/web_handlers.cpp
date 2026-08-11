@@ -332,16 +332,18 @@ static void handleTrigger() {
     return;
   }
 
-  String body = server.arg("plain");
-  int relayNum = 0;
-  for (int i = 1; i <= NUM_RELAYS; i++) {
-    if (body.indexOf("\"relay\":" + String(i)) != -1 || body.indexOf("\"relay\": " + String(i)) != -1) {
-      relayNum = i;
-      break;
-    }
+  StaticJsonDocument<128> doc;
+  DeserializationError err = deserializeJson(doc, server.arg("plain"));
+
+  if (err || !doc.containsKey("relay")) {
+    server.send(400, "application/json", "{\"error\":\"Invalid JSON or missing relay field\"}");
+    return;
   }
-  if (relayNum == 0) {
-    server.send(400, "application/json", "{\"error\":\"Invalid relay\"}");
+
+  int relayNum = doc["relay"].as<int>();
+
+  if (relayNum < 1 || relayNum > NUM_RELAYS) {
+    server.send(400, "application/json", "{\"error\":\"Relay out of range\"}");
     return;
   }
 
