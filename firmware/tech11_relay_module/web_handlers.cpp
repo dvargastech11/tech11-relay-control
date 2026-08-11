@@ -117,17 +117,32 @@ static void handleNetworkSavePage() {
   html += "<style>body{font-family:Arial;background:#1a1a1a;color:#eee;padding:30px;max-width:420px;margin:0 auto;}"
           "input{width:100%;padding:8px;margin:6px 0;border-radius:6px;border:1px solid #444;background:#262626;color:#eee;box-sizing:border-box;}"
           "button{padding:12px;border:none;border-radius:8px;background:#2d6cdf;color:white;cursor:pointer;width:100%;margin-top:10px;}"
-          "label{font-size:14px;color:#ccc;}</style></head><body>";
+          "label{font-size:14px;color:#ccc;} .field{margin-bottom:14px;} .radio-row{margin-bottom:6px;}"
+          "h3{color:#aaa;border-top:1px solid #333;padding-top:14px;margin-top:20px;}</style></head><body>";
   html += "<h2>Network Settings</h2>";
   html += "<form action='/network/save' method='POST'>";
-  html += "<label>Device Name</label><input type='text' name='devname' value='" + deviceName + "'>";
-  html += "<label><input type='radio' name='mode' value='dhcp' " + String(useDHCP ? "checked" : "") + "> DHCP</label><br>";
-  html += "<label><input type='radio' name='mode' value='static' " + String(!useDHCP ? "checked" : "") + "> Static IP</label>";
-  html += "<label>IP Address</label><input type='text' name='ip' value='" + staticIP.toString() + "'>";
-  html += "<label>Gateway</label><input type='text' name='gw' value='" + gatewayIP.toString() + "'>";
-  html += "<label>Subnet Mask</label><input type='text' name='sn' value='" + subnetMask.toString() + "'>";
-  html += "<label>WiFi SSID</label><input type='text' name='ssid' value='" + wifiSSID + "'>";
-  html += "<label>WiFi Password (leave blank to keep current)</label><input type='password' name='wifipass' value=''>";
+
+  html += "<div class='field'><label>Device Name</label><input type='text' name='devname' value='" + deviceName + "'></div>";
+
+  html += "<div class='radio-row'><label><input type='radio' name='mode' value='dhcp' " +
+          String(useDHCP ? "checked" : "") + "> DHCP</label></div>";
+  html += "<div class='field'><label><input type='radio' name='mode' value='static' " +
+          String(!useDHCP ? "checked" : "") + "> Static IP</label></div>";
+
+  html += "<h3>Static IP Settings</h3>";
+  html += "<div class='field'><label>IP Address</label><input type='text' name='ip' value='" + staticIP.toString() + "'></div>";
+  html += "<div class='field'><label>Gateway</label><input type='text' name='gw' value='" + gatewayIP.toString() + "'></div>";
+  html += "<div class='field'><label>Subnet Mask</label><input type='text' name='sn' value='" + subnetMask.toString() + "'></div>";
+  html += "<div class='field'><label>DNS 1</label><input type='text' name='dns1' value='" + dns1.toString() + "'></div>";
+  html += "<div class='field'><label>DNS 2</label><input type='text' name='dns2' value='" + dns2.toString() + "'></div>";
+
+  html += "<h3>Time Sync (NTP)</h3>";
+  html += "<div class='field'><label>NTP Server</label><input type='text' name='ntp' value='" + ntpServer + "' placeholder='pool.ntp.org'></div>";
+
+  html += "<h3>WiFi</h3>";
+  html += "<div class='field'><label>WiFi SSID</label><input type='text' name='ssid' value='" + wifiSSID + "'></div>";
+  html += "<div class='field'><label>WiFi Password (leave blank to keep current)</label><input type='password' name='wifipass' value=''></div>";
+
   html += "<button type='submit'>Save &amp; Reboot</button></form>";
   html += "<p><a href='/' style='color:#2d6cdf;'>&larr; Back</a></p></body></html>";
 
@@ -139,7 +154,12 @@ static void handleNetworkSave() {
 
   String name = server.arg("devname");
   bool dhcp = (server.arg("mode") == "dhcp");
-  saveNetworkConfig(name, dhcp, server.arg("ip"), server.arg("gw"), server.arg("sn"));
+  String dns1Arg = server.arg("dns1");
+  String dns2Arg = server.arg("dns2");
+  String ntpArg = server.arg("ntp");
+  if (ntpArg.length() == 0) ntpArg = "pool.ntp.org"; // guard against an empty field
+
+  saveNetworkConfig(name, dhcp, server.arg("ip"), server.arg("gw"), server.arg("sn"), dns1Arg, dns2Arg, ntpArg);
 
   String newSsid = server.arg("ssid");
   String newWifiPass = server.arg("wifipass");
@@ -247,6 +267,9 @@ static void handleConfigBackup() {
   doc["staticIP"] = staticIP.toString();
   doc["gateway"] = gatewayIP.toString();
   doc["subnet"] = subnetMask.toString();
+  doc["dns1"] = dns1.toString();
+  doc["dns2"] = dns2.toString();
+  doc["ntpServer"] = ntpServer;
   doc["wifiSSID"] = wifiSSID;
   doc["firmwareVersion"] = CURRENT_FIRMWARE_VERSION;
 
@@ -286,7 +309,8 @@ static void handleConfigRestoreSubmit() {
   saveNetworkConfig(
     doc["deviceName"] | deviceName, doc["useDHCP"] | useDHCP,
     doc["staticIP"] | staticIP.toString(), doc["gateway"] | gatewayIP.toString(),
-    doc["subnet"] | subnetMask.toString()
+    doc["subnet"] | subnetMask.toString(), doc["dns1"] | dns1.toString(),
+    doc["dns2"] | dns2.toString(), doc["ntpServer"] | ntpServer
   );
   if (doc["wifiSSID"]) saveWifiCredentials(doc["wifiSSID"].as<String>(), "");
 
@@ -363,7 +387,8 @@ static void handleApiNetworkSave() {
   saveNetworkConfig(
     doc["deviceName"] | deviceName, doc["useDHCP"] | useDHCP,
     doc["staticIP"] | staticIP.toString(), doc["gateway"] | gatewayIP.toString(),
-    doc["subnet"] | subnetMask.toString()
+    doc["subnet"] | subnetMask.toString(), doc["dns1"] | dns1.toString(),
+    doc["dns2"] | dns2.toString(), doc["ntpServer"] | ntpServer
   );
 
   server.send(200, "application/json", "{\"status\":\"saved, rebooting\"}");

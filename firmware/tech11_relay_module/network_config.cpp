@@ -9,6 +9,9 @@ bool useDHCP = false;
 IPAddress staticIP(192, 168, 55, 230);
 IPAddress gatewayIP(192, 168, 55, 1);
 IPAddress subnetMask(255, 255, 255, 0);
+IPAddress dns1(8, 8, 8, 8);
+IPAddress dns2(8, 8, 4, 4);
+String ntpServer = "pool.ntp.org";
 String wifiSSID;
 String wifiPassword;
 bool isInAPMode = false;
@@ -30,6 +33,9 @@ void loadNetworkConfig() {
   staticIP.fromString(prefs.getString("ip", staticIP.toString()));
   gatewayIP.fromString(prefs.getString("gw", gatewayIP.toString()));
   subnetMask.fromString(prefs.getString("sn", subnetMask.toString()));
+  dns1.fromString(prefs.getString("dns1", dns1.toString()));
+  dns2.fromString(prefs.getString("dns2", dns2.toString()));
+  ntpServer = prefs.getString("ntp", NTP_SERVER);
   wifiSSID = prefs.getString("wifissid", DEFAULT_WIFI_SSID);
   wifiPassword = prefs.getString("wifipass", DEFAULT_WIFI_PASSWORD);
   prefs.end();
@@ -41,17 +47,22 @@ void loadNetworkConfig() {
 void ensureDeviceNameSet() {
   if (deviceName.length() == 0) {
     deviceName = generateDeviceName();
-    saveNetworkConfig(deviceName, useDHCP, staticIP.toString(), gatewayIP.toString(), subnetMask.toString());
+    saveNetworkConfig(deviceName, useDHCP, staticIP.toString(), gatewayIP.toString(),
+                       subnetMask.toString(), dns1.toString(), dns2.toString(), ntpServer);
   }
 }
 
-void saveNetworkConfig(String name, bool dhcp, String ip, String gw, String sn) {
+void saveNetworkConfig(String name, bool dhcp, String ip, String gw, String sn,
+                        String dns1Str, String dns2Str, String ntpStr) {
   prefs.begin("netcfg", false);
   prefs.putString("devname", name);
   prefs.putBool("dhcp", dhcp);
   prefs.putString("ip", ip);
   prefs.putString("gw", gw);
   prefs.putString("sn", sn);
+  prefs.putString("dns1", dns1Str);
+  prefs.putString("dns2", dns2Str);
+  prefs.putString("ntp", ntpStr);
   prefs.end();
 }
 
@@ -63,7 +74,7 @@ void saveWifiCredentials(String ssid, String password) {
 }
 
 bool connectToWiFi() {
-  if (!useDHCP) WiFi.config(staticIP, gatewayIP, subnetMask);
+  if (!useDHCP) WiFi.config(staticIP, gatewayIP, subnetMask, dns1, dns2);
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(deviceName.c_str());
   WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());

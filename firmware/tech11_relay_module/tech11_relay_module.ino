@@ -49,7 +49,7 @@ void setup() {
   deviceApiKey = computeDeviceApiKey();
 
   if (!isInAPMode) {
-    configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
+    configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, ntpServer.c_str());
   }
 
   setupDiscovery();

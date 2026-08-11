@@ -31,6 +31,8 @@
 #define DISCOVERY_PORT 4210
 
 // NTP
+// Default NTP server, used only the first time the device boots (before
+// any config is saved). Editable afterward on the Network Settings page.
 #define NTP_SERVER "pool.ntp.org"
 #define GMT_OFFSET_SEC (-5 * 3600)  // EST - adjust for your timezone
 #define DAYLIGHT_OFFSET_SEC 3600
