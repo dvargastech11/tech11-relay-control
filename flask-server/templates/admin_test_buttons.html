@@ -3,40 +3,47 @@
 {% block content %}
   <h1>Test Buttons</h1>
   <p style="color:#888; max-width:600px; margin:0 auto 20px;">
-    Fires a relay directly by number, bypassing floor labels/scheduling. Useful for verifying
-    wiring during install before floors are fully configured.
+    Fires a relay directly by number, bypassing floor labels/scheduling. Each device shows all
+    {{ hardware_channels }} hardware channels - greyed-out ones aren't tied to a configured floor yet.
   </p>
 
-  <div style="max-width:600px; margin:0 auto; display:flex; flex-direction:column; gap:14px;">
+  <div style="max-width:650px; margin:0 auto; display:flex; flex-direction:column; gap:16px;">
     {% for d in devices %}
+      {% set device_idx = loop.index %}
       <div style="background:#262626; border-radius:10px; padding:16px;">
         <div style="font-weight:bold; margin-bottom:4px;">{{ d.device_name }}</div>
         <div style="color:#888; font-size:13px; margin-bottom:12px;">
           {{ d.building_name }} - Elevator {{ d.elevator_number }} &middot; {{ d.device_ip }}
+          &middot; {{ d.num_configured }} of {{ hardware_channels }} channels configured
         </div>
 
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-          <label style="font-size:13px; color:#aaa;">Relay #</label>
-          <input type="number" min="1" value="1" id="relay-{{ loop.index }}"
-            style="width:70px; padding:8px; border-radius:6px; border:1px solid #444; background:#1a1a1a; color:#eee;">
-
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
           <label style="font-size:13px; color:#aaa;">Hold (ms)</label>
-          <input type="number" min="100" step="100" value="5000" id="duration-{{ loop.index }}"
-            style="width:90px; padding:8px; border-radius:6px; border:1px solid #444; background:#1a1a1a; color:#eee;">
-
-          <button onclick="fireRelay('{{ d.device_ip }}', '{{ d.device_mac or '' }}', {{ loop.index }})"
-            style="padding:8px 16px; border:none; border-radius:6px; background:#2d6cdf; color:white; cursor:pointer;">
-            Fire
-          </button>
+          <input type="number" min="100" step="100" value="5000" id="duration-{{ device_idx }}"
+            style="width:90px; padding:6px; border-radius:6px; border:1px solid #444; background:#1a1a1a; color:#eee;">
         </div>
 
-        {% if d.num_relays %}
-        <div style="color:#666; font-size:12px; margin-top:8px;">
-          {{ d.num_relays }} relay(s) configured for this elevator's floors.
+        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px;">
+          {% for r in d.relay_grid %}
+            {% if r.configured %}
+              <button
+                onclick="fireRelay('{{ d.device_ip }}', '{{ d.device_mac or '' }}', {{ r.relay_num }}, {{ device_idx }})"
+                title="{{ r.label }}"
+                style="padding:10px 4px; border:none; border-radius:6px; background:#2d6cdf; color:white;
+                  cursor:pointer; font-size:13px; line-height:1.3;">
+                {{ r.relay_num }}<br><span style="font-size:11px; opacity:0.85;">{{ r.label }}</span>
+              </button>
+            {% else %}
+              <button disabled title="Not configured"
+                style="padding:10px 4px; border:none; border-radius:6px; background:#333; color:#666;
+                  cursor:not-allowed; font-size:13px;">
+                {{ r.relay_num }}
+              </button>
+            {% endif %}
+          {% endfor %}
         </div>
-        {% endif %}
 
-        <div id="status-{{ loop.index }}" style="color:#aaa; font-size:13px; margin-top:8px;"></div>
+        <div id="status-{{ device_idx }}" style="color:#aaa; font-size:13px; margin-top:10px;"></div>
       </div>
     {% else %}
       <p style="color:#888;">No elevators have a device assigned yet. Go to Manage Buildings to assign one.</p>
@@ -44,10 +51,9 @@
   </div>
 
   <script>
-    async function fireRelay(ip, mac, idx) {
-      const relayNum = document.getElementById('relay-' + idx).value;
-      const duration = document.getElementById('duration-' + idx).value;
-      const statusEl = document.getElementById('status-' + idx);
+    async function fireRelay(ip, mac, relayNum, deviceIdx) {
+      const duration = document.getElementById('duration-' + deviceIdx).value;
+      const statusEl = document.getElementById('status-' + deviceIdx);
 
       statusEl.textContent = `Sending relay ${relayNum} for ${duration}ms...`;
 

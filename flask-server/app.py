@@ -265,6 +265,8 @@ def activate(building_id, elevator_number, floor_number, duration_ms):
 
 # ---- ADMIN: TEST BUTTONS (raw relay test, bypasses floor/schedule config) ----
 
+HARDWARE_CHANNELS_PER_DEVICE = 16  # matches the 16-channel relay board design
+
 @app.route("/admin/test-buttons")
 @admin_required
 def admin_test_buttons():
@@ -273,6 +275,26 @@ def admin_test_buttons():
     for building in data["buildings"]:
         for elevator in building["elevators"]:
             if elevator.get("device_ip"):
+                floors = elevator.get("floors") or []
+
+                # Build a 1..16 relay grid: relay N is "configured" if the
+                # elevator has a floor at that position, showing its label;
+                # anything beyond the configured floor count stays greyed out.
+                relay_grid = []
+                for relay_num in range(1, HARDWARE_CHANNELS_PER_DEVICE + 1):
+                    if relay_num <= len(floors):
+                        relay_grid.append({
+                            "relay_num": relay_num,
+                            "configured": True,
+                            "label": floors[relay_num - 1]["label"],
+                        })
+                    else:
+                        relay_grid.append({
+                            "relay_num": relay_num,
+                            "configured": False,
+                            "label": None,
+                        })
+
                 devices_list.append({
                     "building_id": building["id"],
                     "building_name": building["name"],
@@ -280,9 +302,13 @@ def admin_test_buttons():
                     "device_name": elevator.get("device_name") or elevator["device_ip"],
                     "device_ip": elevator["device_ip"],
                     "device_mac": elevator.get("device_mac"),
-                    "num_relays": len(elevator["floors"]) if elevator["floors"] else elevator.get("num_floors", 0),
+                    "relay_grid": relay_grid,
+                    "num_configured": len(floors),
                 })
-    return render_template("admin_test_buttons.html", active_page="test_buttons", devices=devices_list)
+    return render_template(
+        "admin_test_buttons.html", active_page="test_buttons",
+        devices=devices_list, hardware_channels=HARDWARE_CHANNELS_PER_DEVICE,
+    )
 
 
 @app.route("/admin/test-buttons/fire", methods=["POST"])
