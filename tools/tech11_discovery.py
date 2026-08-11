@@ -65,54 +65,31 @@ class DiscoveryApp:
     def __init__(self, root):
         self.root = root
         root.title("Tech 11 Device Discovery")
-        root.geometry("650x400")
-        root.configure(bg="#1a1a1a")
+        root.geometry("600x450")
+        root.minsize(550, 400)
 
-        header = tk.Label(
-            root, text="Tech 11 - Device Discovery",
-            font=("Segoe UI", 16, "bold"), bg="#1a1a1a", fg="white"
-        )
-        header.pack(pady=15)
+        tk.Label(root, text="Tech 11 Device Discovery", font=("Arial", 14, "bold")).pack(pady=10)
 
-        self.status_label = tk.Label(
-            root, text="Click 'Scan Network' to find devices.",
-            font=("Segoe UI", 10), bg="#1a1a1a", fg="#aaaaaa"
-        )
+        self.status_label = tk.Label(root, text="Click 'Scan Network' to find devices.")
         self.status_label.pack(pady=(0, 10))
 
-        style = ttk.Style()
-        style.theme_use("default")
-        style.configure("Treeview", background="#262626", foreground="white",
-                         fieldbackground="#262626", rowheight=28, font=("Segoe UI", 10))
-        style.configure("Treeview.Heading", background="#2d6cdf", foreground="white",
-                         font=("Segoe UI", 10, "bold"))
-        style.map("Treeview", background=[("selected", "#2fbf4f")])
-
         columns = ("name", "ip", "mac")
-        self.tree = ttk.Treeview(root, columns=columns, show="headings", height=10)
+        self.tree = ttk.Treeview(root, columns=columns, show="headings", height=8)
         self.tree.heading("name", text="Device Name")
         self.tree.heading("ip", text="IP Address")
         self.tree.heading("mac", text="MAC Address")
-        self.tree.column("name", width=220)
-        self.tree.column("ip", width=150)
-        self.tree.column("mac", width=180)
-        self.tree.pack(padx=20, pady=10, fill="both", expand=True)
+        self.tree.column("name", width=200)
+        self.tree.column("ip", width=130)
+        self.tree.column("mac", width=160)
+        self.tree.pack(padx=15, pady=5, fill="both", expand=True)
 
-        btn_frame = tk.Frame(root, bg="#1a1a1a")
-        btn_frame.pack(pady=10)
+        btn_frame = tk.Frame(root)
+        btn_frame.pack(pady=15)
 
-        self.scan_btn = tk.Button(
-            btn_frame, text="Scan Network", command=self.start_scan,
-            bg="#2d6cdf", fg="white", font=("Segoe UI", 11, "bold"),
-            padx=20, pady=8, relief="flat", cursor="hand2"
-        )
+        self.scan_btn = tk.Button(btn_frame, text="Scan Network", command=self.start_scan, width=15)
         self.scan_btn.pack(side="left", padx=5)
 
-        self.open_btn = tk.Button(
-            btn_frame, text="Open Selected in Browser", command=self.open_selected,
-            bg="#333333", fg="white", font=("Segoe UI", 11),
-            padx=20, pady=8, relief="flat", cursor="hand2"
-        )
+        self.open_btn = tk.Button(btn_frame, text="Open Selected", command=self.open_selected, width=15)
         self.open_btn.pack(side="left", padx=5)
 
     def start_scan(self):
