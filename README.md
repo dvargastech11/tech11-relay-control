@@ -23,11 +23,7 @@ python -m pip install flask requests flask-login werkzeug
 python app.py
 ```
 
-Then open `http://<server-ip>:5000` in a browser.
-
-**Default logins** (forced password change on first login):
-- `admin` / `T1123456` - full access
-- `operator` / `T1123456` - floor buttons only
+Then open `http://<server-ip>:5000` in a browser and log in with your admin credentials.
 
 ## ESP32 firmware setup
 
