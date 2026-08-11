@@ -33,7 +33,12 @@ void loadNetworkConfig() {
   wifiSSID = prefs.getString("wifissid", DEFAULT_WIFI_SSID);
   wifiPassword = prefs.getString("wifipass", DEFAULT_WIFI_PASSWORD);
   prefs.end();
+  // NOTE: device name auto-generation (if empty) now happens in
+  // ensureDeviceNameSet(), called AFTER WiFi is initialized - the MAC
+  // address isn't valid/populated until then, otherwise you get "Tech11_0000".
+}
 
+void ensureDeviceNameSet() {
   if (deviceName.length() == 0) {
     deviceName = generateDeviceName();
     saveNetworkConfig(deviceName, useDHCP, staticIP.toString(), gatewayIP.toString(), subnetMask.toString());

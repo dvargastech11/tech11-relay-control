@@ -376,6 +376,13 @@ static void handleApiNetworkSave() {
 // ============================================================
 
 void registerWebHandlers() {
+  // ESP32 WebServer only exposes custom headers (like X-API-Key) through
+  // server.hasHeader()/server.header() if they're explicitly collected first.
+  // Without this, checkApiKey() always sees the header as "missing" even
+  // when the client sends it correctly.
+  static const char* collectedHeaders[] = { "X-API-Key" };
+  server.collectHeaders(collectedHeaders, 1);
+
   server.on("/", handleRoot);
   server.on("/change-password", HTTP_GET, handleChangePasswordPage);
   server.on("/change-password", HTTP_POST, handleChangePasswordSubmit);

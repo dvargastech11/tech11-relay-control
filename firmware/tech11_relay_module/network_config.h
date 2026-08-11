@@ -14,6 +14,7 @@ extern String wifiPassword;
 extern bool isInAPMode;
 
 String generateDeviceName();
+void ensureDeviceNameSet();
 void loadNetworkConfig();
 void saveNetworkConfig(String name, bool dhcp, String ip, String gw, String sn);
 void saveWifiCredentials(String ssid, String password);

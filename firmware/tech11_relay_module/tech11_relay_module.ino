@@ -45,6 +45,7 @@ void setup() {
   loadAuthConfig();
   setupWiFiWithFallback();
 
+  ensureDeviceNameSet();  // MAC is only valid now that WiFi has initialized
   deviceApiKey = computeDeviceApiKey();
 
   if (!isInAPMode) {
