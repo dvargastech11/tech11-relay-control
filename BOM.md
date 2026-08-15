@@ -8,35 +8,36 @@ _Last updated: see git commit history for this file._
 
 ## Purchases To Date
 
-Consolidated across both orders placed so far, with received/in-transit status.
+Consolidated across all orders placed so far, with received/in-transit status.
 
-| Item | Qty | Unit Price | Line Total | Status |
-|---|---|---|---|---|
-| MCP23017 I/O Expander (Order 1) | 6 | $12.40 | $74.40 | Received |
-| ACEIRMC 16-Channel Relay Board 4-pack (Order 1) | 1 pack | $26.99 | $26.99 | Received |
-| HiLetgo ESP-WROOM-32 (Order 1) | 12 | $9.99 | $119.88 | Received |
-| Mean Well MDR-60-5 (Order 1) | 1 | $25.14 | $25.14 | Received |
-| MDR-10-5 (Order 1) | 1 | $14.34 | $14.34 | Received |
-| DWEII LAN8720 2-pack (Order 1) | 1 pack | $11.29 | $11.29 | Received |
-| ~~Mean Well MDR-20-5~~ | ~~1~~ | ~~$19.99~~ | ~~$19.99~~ | Cancelled/returned |
-| PCB Board Mounting Feet 60-pk (Order 2) | 1 | $9.99 | $9.99 | Placed, est. Aug 13-14 |
-| DWEII LAN8720 2-pack (Order 2) | 5 packs | $11.29 | $56.45 | Placed, est. Aug 13-14 |
-| VAMRONE Aluminum DIN Rail 6-pack | 1 | $6.99 | $6.99 | Placed, est. Aug 13-14 |
-| Antrader FC-10P IDC Connector 50-pack | 1 | $7.99 | $7.99 | Placed, est. Aug 13-14 |
-| Connectors Pro IDC Ribbon Cable (33ft) | 1 | $7.99 | $7.99 | Placed, est. Aug 14 |
-| EDGELEC 4.7K Resistor 100-pack | 1 | $5.99 | $5.99 | Placed, est. Aug 13-14 |
-| Mean Well MDR-60-5 (Order 2) | 1 | $23.99 | $23.99 | Placed, est. Aug 13-14 |
-| MDR-10-5 (Order 2) | 1 | $14.34 | $14.34 | Placed, est. Aug 18 |
-| ACEIRMC 16-Ch Relay Board 4-pack (Order 2) | 8 packs | $26.99 | $215.92 | Placed, est. Aug 12-14 |
-| naughtystarts ESP32 Screw Terminal Breakout 2-pack | 6 packs | $11.99 | $71.94 | Placed, est. Aug 12-14 |
-| MCP23017 I/O Expander (Order 2) | 30 | $12.40 | $372.00 | Placed, est. Aug 21-25 |
+| Order # | Item | Qty | Unit Price | Line Total | Status |
+|---|---|---|---|---|---|
+| 113-1737006-4897848 | MCP23017 I/O Expander | 6 | $12.40 | $74.40 | Received |
+| 113-8976168-3128228 | ~~Mean Well MDR-20-5~~ | ~~1~~ | ~~$19.99~~ | ~~$19.99~~ | **Refunded** |
+| 113-9008593-9929019 | ACEIRMC 16-Channel Relay Board 4-pack | 1 pack | $26.99 | $26.99 | Received |
+| 113-9008593-9929019 | HiLetgo ESP-WROOM-32 | 12 | $9.99 | $119.88 | Received |
+| 113-9008593-9929019 | Mean Well MDR-60-5 | 1 | $25.14 | $25.14 | Received |
+| 114-8767660-6248263 | MDR-10-5 | 1 | $14.34 | $14.34 | Received |
+| 114-9883046-3814641 | DWEII LAN8720 2-pack | 1 pack | $11.29 | $11.29 | Received |
+| 114-9187607-1805044 | MCP23017 I/O Expander | 30 | $12.40 | $372.00 | Placed, est. Aug 21-25 |
+| 114-9187607-1805044 | naughtystarts ESP32 Screw Terminal Breakout 2-pack | 6 packs | $11.99 | $71.94 | Placed, split shipments |
+| 114-9187607-1805044 | ACEIRMC 16-Ch Relay Board 4-pack | 8 packs | $26.99 | $215.92 | Placed, split shipments |
+| 114-7642738-2269837 | Mean Well MDR-60-5 | 1 | $23.99 | $23.99 | Placed, est. Aug 17-18 |
+| 114-1959550-5055401 | MDR-10-5 | 1 | $14.34 | $14.34 | Placed, est. Tuesday |
+| 114-1959550-5055401 | EDGELEC 4.7K Resistor 100-pack | 1 | $5.99 | $5.99 | Placed, delayed/not yet shipped |
+| 114-1959550-5055401 | DWEII LAN8720 2-pack | 5 packs | $11.29 | $56.45 | Placed, delayed/not yet shipped |
+| 114-1959550-5055401 | PCB Board Mounting Feet 60-pk | 1 | $9.99 | $9.99 | Placed, delayed/not yet shipped |
+| 114-1959550-5055401 | Antrader FC-10P IDC Connector 50-pack | 1 | $7.99 | $7.99 | Placed, delayed/not yet shipped |
+| 114-1959550-5055401 | Connectors Pro IDC Ribbon Cable (33ft) | 1 | $7.99 | $7.99 | Placed, arriving today |
+| 114-1959550-5055401 | VAMRONE Aluminum DIN Rail 6-pack | 1 | $6.99 | $6.99 | Placed, delayed/not yet shipped |
 
-**Received to date: $271.04** (excluding cancelled MDR-20-5)
-**Order 2 total (with tax): $849.21**
+**Received to date: $271.04** (excluding refunded MDR-20-5)
+**In-transit orders total (with tax): $849.21** ($706.12 + $25.67 + $117.42)
 **Combined project spend to date: ~$1,120.25**
 
-_Note: IDC connector 50-pack and IDC ribbon cable were added in Order 2 - purpose (enclosure wiring? alternative to jumper wires?) not yet confirmed, not categorized into the sections below._
+_Note: IDC connector 50-pack and IDC ribbon cable were added in Order 114-1959550-5055401 - purpose (enclosure wiring? alternative to jumper wires?) not yet confirmed, not categorized into the sections below._
 _Note: DIN rail (6-pack) added for enclosure/panel mounting - not yet reflected in a dedicated enclosure section below._
+
 
 ## Per-Elevator Electronics
 
