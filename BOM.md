@@ -19,17 +19,17 @@ Consolidated across all orders placed so far, with received/in-transit status.
 | 113-9008593-9929019 | Mean Well MDR-60-5 | 1 | $25.14 | $25.14 | Received |
 | 114-8767660-6248263 | MDR-10-5 | 1 | $14.34 | $14.34 | Received |
 | 114-9883046-3814641 | DWEII LAN8720 2-pack | 1 pack | $11.29 | $11.29 | Received |
-| 114-9187607-1805044 | MCP23017 I/O Expander | 30 | $12.40 | $372.00 | Placed, est. Aug 21-25 |
-| 114-9187607-1805044 | naughtystarts ESP32 Screw Terminal Breakout 2-pack | 6 packs | $11.99 | $71.94 | Placed, split shipments |
-| 114-9187607-1805044 | ACEIRMC 16-Ch Relay Board 4-pack | 8 packs | $26.99 | $215.92 | Placed, split shipments |
-| 114-7642738-2269837 | Mean Well MDR-60-5 | 1 | $23.99 | $23.99 | Placed, est. Aug 17-18 |
-| 114-1959550-5055401 | MDR-10-5 | 1 | $14.34 | $14.34 | Placed, est. Tuesday |
-| 114-1959550-5055401 | EDGELEC 4.7K Resistor 100-pack | 1 | $5.99 | $5.99 | Placed, delayed/not yet shipped |
-| 114-1959550-5055401 | DWEII LAN8720 2-pack | 5 packs | $11.29 | $56.45 | Placed, delayed/not yet shipped |
-| 114-1959550-5055401 | PCB Board Mounting Feet 60-pk | 1 | $9.99 | $9.99 | Placed, delayed/not yet shipped |
-| 114-1959550-5055401 | Antrader FC-10P IDC Connector 50-pack | 1 | $7.99 | $7.99 | Placed, delayed/not yet shipped |
-| 114-1959550-5055401 | Connectors Pro IDC Ribbon Cable (33ft) | 1 | $7.99 | $7.99 | Placed, arriving today |
-| 114-1959550-5055401 | VAMRONE Aluminum DIN Rail 6-pack | 1 | $6.99 | $6.99 | Placed, delayed/not yet shipped |
+| 114-9187607-1805044 | MCP23017 I/O Expander | 30 | $12.40 | $372.00 | Placed, est. Aug 21-25 (split as 13+17 shipments) |
+| 114-9187607-1805044 | naughtystarts ESP32 Screw Terminal Breakout 2-pack | 6 packs | $11.99 | $71.94 | **Delayed to Tuesday** (was Aug 16) |
+| 114-9187607-1805044 | ACEIRMC 16-Ch Relay Board 4-pack | 8 packs | $26.99 | $215.92 | Split shipments, mostly arriving today/tomorrow |
+| 114-7642738-2269837 | Mean Well MDR-60-5 | 1 | $23.99 | $23.99 | **Delayed to Aug 18-19** (was Aug 17-18) |
+| 114-1959550-5055401 | MDR-10-5 | 1 | $14.34 | $14.34 | Arriving Thursday |
+| 114-1959550-5055401 | EDGELEC 4.7K Resistor 100-pack | 1 | $5.99 | $5.99 | Arriving today |
+| 114-1959550-5055401 | DWEII LAN8720 2-pack | 5 packs | $11.29 | $56.45 | Arriving today (split as 4+1 shipments) |
+| 114-1959550-5055401 | PCB Board Mounting Feet 60-pk | 1 | $9.99 | $9.99 | In transit |
+| 114-1959550-5055401 | Antrader FC-10P IDC Connector 50-pack | 1 | $7.99 | $7.99 | In transit |
+| 114-1959550-5055401 | Connectors Pro IDC Ribbon Cable (33ft) | 1 | $7.99 | $7.99 | Arriving today |
+| 114-1959550-5055401 | VAMRONE Aluminum DIN Rail 6-pack | 1 | $6.99 | $6.99 | In transit |
 
 **Received to date: $271.04** (excluding refunded MDR-20-5)
 **In-transit orders total (with tax): $849.21** ($706.12 + $25.67 + $117.42)
