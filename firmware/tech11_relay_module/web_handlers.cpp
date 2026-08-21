@@ -10,6 +10,7 @@
 #include <Update.h>
 #include <ArduinoJson.h>
 #include <esp_ota_ops.h>
+#include <ETH.h>
 
 extern WebServer server; // defined in the main .ino
 
