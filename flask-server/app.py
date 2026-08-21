@@ -22,6 +22,8 @@ Local Users and Groups) to add/remove/change passwords for admin accounts.
 """
 
 import os
+import threading
+import time
 import subprocess
 from functools import wraps
 import requests
@@ -600,13 +602,36 @@ SERVICE_NAME = "Tech11RelayServer"
 
 def _restart_service():
     """Restarts the running service so a git pull's changes take effect.
-    Platform-aware: Windows Server uses NSSM-managed services (net stop/
-    start), Linux uses systemd."""
-    if platform.system() == "Windows":
-        subprocess.Popen(["net", "stop", SERVICE_NAME], shell=True)
-        subprocess.Popen(["net", "start", SERVICE_NAME], shell=True)
-    else:
-        subprocess.Popen(["sudo", "systemctl", "restart", SERVICE_NAME])
+    Platform-aware: Windows Server uses NSSM-managed services (via sc.exe),
+    Linux uses systemd.
+
+    IMPORTANT: this runs in a background thread, detached from the request
+    that triggered it, and explicitly WAITS for the stop to complete before
+    issuing start. Firing 'net stop' and 'net start' back-to-back via
+    Popen (no wait) is a real race condition - the start can execute before
+    the Service Control Manager has finished tearing down the old process,
+    which can leave the service stuck in a 'Paused' or otherwise confused
+    state that doesn't respond to a normal Resume/Start."""
+    def _do_restart():
+        if platform.system() == "Windows":
+            subprocess.run(["sc.exe", "stop", SERVICE_NAME], capture_output=True, timeout=15)
+            # Poll until the SCM actually reports STOPPED rather than a fixed sleep -
+            # more reliable across slower shutdowns (e.g. NSSM waiting on the Python process).
+            for _ in range(20):  # up to ~10 seconds
+                time.sleep(0.5)
+                result = subprocess.run(
+                    ["sc.exe", "query", SERVICE_NAME], capture_output=True, text=True, timeout=5
+                )
+                if "STOPPED" in result.stdout:
+                    break
+            subprocess.run(["sc.exe", "start", SERVICE_NAME], capture_output=True, timeout=15)
+        else:
+            subprocess.run(["sudo", "systemctl", "restart", SERVICE_NAME], timeout=15)
+
+    # This request's own process is what's about to be killed by the stop
+    # command above, so we don't wait on this thread - just fire it and
+    # return a response immediately.
+    threading.Thread(target=_do_restart, daemon=True).start()
 
 
 @app.route("/admin/update-from-git", methods=["POST"])

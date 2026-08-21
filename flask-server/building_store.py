@@ -1,10 +1,17 @@
 """
 Building / Elevator / Floor configuration store.
 ---------------------------------------------------
-Persists to buildings.json OUTSIDE the git repo folder (in ~/tech11-data/),
-so a `git pull` on the repo can never overwrite or delete it - even if the
-file was accidentally committed at some point in the past, since it now
-lives entirely outside any directory git touches.
+Persists to buildings.json OUTSIDE the git repo folder, so a `git pull`
+can never overwrite or delete it.
+
+IMPORTANT (Windows): uses a fixed absolute path rather than
+os.path.expanduser("~") deliberately. On Windows, "~" resolves to a
+different folder depending on which account runs the process - your own
+logged-in profile when testing manually (e.g. C:\\Users\\YourName), but
+typically C:\\Windows\\system32\\config\\systemprofile when the NSSM
+service runs as Local System. Using expanduser() would silently make the
+service and manual testing read/write two different files, making config
+appear to "reset" for no visible reason. A fixed path avoids that.
 
 Building -> Elevators (unique elevator_number per building) -> Floors
     Each floor: enabled, always_available, schedule (optional)
@@ -14,12 +21,16 @@ Building -> Elevators (unique elevator_number per building) -> Floors
 import json
 import os
 import shutil
+import platform
 from datetime import datetime
 
-# Persistent data lives outside the repo folder entirely - git operations
-# (pull, checkout, reset) only ever touch files inside the repo directory,
-# so this location is safe from being overwritten or wiped by a code update.
-DATA_DIR = os.path.expanduser("~/tech11-data")
+# Fixed, explicit path - same location regardless of which account runs
+# the process (your interactive login vs. the NSSM service's account).
+if platform.system() == "Windows":
+    DATA_DIR = r"C:\tech11-data"
+else:
+    DATA_DIR = os.path.expanduser("~/tech11-data")
+
 DATA_FILE = os.path.join(DATA_DIR, "buildings.json")
 
 # Old location (inside the repo folder) used before this fix - if data
