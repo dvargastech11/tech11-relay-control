@@ -25,5 +25,6 @@ void saveWifiCredentials(String ssid, String password);
 bool connectToWiFi();
 void startFallbackAP();
 void setupWiFiWithFallback();
+void startBackgroundReconnectAttempt();
 
 #endif

@@ -90,10 +90,22 @@ bool connectToWiFi() {
 void startFallbackAP() {
   isInAPMode = true;
   String apSsid = "Tech11-Setup-" + deviceName.substring(deviceName.length() - 4);
-  WiFi.mode(WIFI_AP);
+
+  // AP_STA (not just AP) so we can keep the setup network up for a human
+  // to reconfigure via, WHILE also periodically retrying the originally
+  // configured WiFi in the background - see startBackgroundReconnectAttempt().
+  WiFi.mode(WIFI_AP_STA);
   WiFi.softAPConfig(apIP, apGateway, apSubnet);
   WiFi.softAP(apSsid.c_str(), AP_PASSWORD);
   Serial.println("[WIFI] AP fallback active: " + apSsid + " @ " + WiFi.softAPIP().toString());
+}
+
+void startBackgroundReconnectAttempt() {
+  // Non-blocking - WiFi.begin() returns immediately and connects
+  // asynchronously. The caller (main loop) checks WiFi.status() on a
+  // later pass to see if it succeeded. Safe to call repeatedly.
+  if (!useDHCP) WiFi.config(staticIP, gatewayIP, subnetMask, dns1, dns2);
+  WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
 }
 
 void setupWiFiWithFallback() {

@@ -50,14 +50,17 @@ void setup() {
 
   if (!isInAPMode) {
     configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, ntpServer.c_str());
+
+    // Discovery and OTA both require the Pi/network to actually reach this
+    // device - pointless while isolated in the AP fallback setup network,
+    // and skipping them here also trims the attack surface during setup.
+    setupDiscovery();
+
+    ArduinoOTA.setHostname(deviceName.c_str());
+    ArduinoOTA.setPort(3232);
+    // No OTA password set - add ArduinoOTA.setPassword("...") before production.
+    ArduinoOTA.begin();
   }
-
-  setupDiscovery();
-
-  ArduinoOTA.setHostname(deviceName.c_str());
-  ArduinoOTA.setPort(3232);
-  // No OTA password set - add ArduinoOTA.setPassword("...") before production.
-  ArduinoOTA.begin();
 
   registerWebHandlers();
   server.begin();
@@ -70,15 +73,39 @@ void setup() {
 
 void loop() {
   server.handleClient();
-  ArduinoOTA.handle();
-  handleDiscoveryRequests();
 
-  static unsigned long lastAutoUpdateCheck = 0;
-  unsigned long now = millis();
-  const unsigned long AUTO_UPDATE_CHECK_INTERVAL_MS = 24UL * 60 * 60 * 1000;
+  if (!isInAPMode) {
+    ArduinoOTA.handle();
+    handleDiscoveryRequests();
 
-  if (!isInAPMode && now - lastAutoUpdateCheck > AUTO_UPDATE_CHECK_INTERVAL_MS) {
-    lastAutoUpdateCheck = now;
-    checkForUpdates(false);
+    static unsigned long lastAutoUpdateCheck = 0;
+    unsigned long now = millis();
+    const unsigned long AUTO_UPDATE_CHECK_INTERVAL_MS = 24UL * 60 * 60 * 1000;
+
+    if (now - lastAutoUpdateCheck > AUTO_UPDATE_CHECK_INTERVAL_MS) {
+      lastAutoUpdateCheck = now;
+      checkForUpdates(false);
+    }
+  } else {
+    // In AP fallback mode: periodically retry the originally configured
+    // WiFi in the background (AP stays up the whole time for setup access).
+    // If it connects, restart to cleanly re-enter normal operation -
+    // simpler and safer than trying to hot-swap discovery/OTA/NTP state
+    // at runtime.
+    static unsigned long lastReconnectAttempt = 0;
+    const unsigned long RECONNECT_RETRY_INTERVAL_MS = 60UL * 1000; // every 60s
+    unsigned long now = millis();
+
+    if (now - lastReconnectAttempt > RECONNECT_RETRY_INTERVAL_MS) {
+      lastReconnectAttempt = now;
+      Serial.println("[WIFI] AP mode: attempting background reconnect to configured network...");
+      startBackgroundReconnectAttempt();
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("[WIFI] Reconnected to configured network - restarting to fully exit AP mode...");
+      delay(500);
+      ESP.restart();
+    }
   }
 }
