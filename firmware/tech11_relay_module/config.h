@@ -5,16 +5,11 @@
 // CHANGE THESE BEFORE FLASHING / BEFORE PRODUCTION
 // ============================================================
 
-// NOTE: There is deliberately NO hardcoded default WiFi SSID/password here.
-// This firmware is meant to be identical "base firmware" across every
-// device - a fresh, unconfigured device has no saved WiFi credentials in
-// its NVS storage, so it always comes up in AP fallback mode on first
-// boot. WiFi is then configured once through the AP setup portal (or the
-// normal Network Settings page once connected) and saved to NVS via the
-// Preferences library - a completely separate flash partition from the
-// firmware code itself. Future firmware updates (OTA or Pi-initiated
-// push) only replace the code partition, so saved WiFi config always
-// survives an update untouched.
+// NOTE: Ethernet (LAN8720) is the PRIMARY network connection - see the
+// ETH_PHY_* pins below. WiFi is used ONLY as a fallback setup network
+// (Tech11-Setup-XXXX) when Ethernet isn't connected - there is no WiFi STA
+// client mode in production anymore. A fresh device with no Ethernet link
+// yet will boot straight into the setup AP.
 
 // Must match MASTER_SECRET in the Flask server's devices.py EXACTLY.
 #define MASTER_SECRET "Tech11-Master-Secret-ChangeThisBeforeProduction-2026"
@@ -24,10 +19,20 @@
 #define GITHUB_VERSION_URL  "https://raw.githubusercontent.com/dvargastech11/tech11-relay-control/main/firmware/version.txt"
 #define GITHUB_FIRMWARE_URL "https://raw.githubusercontent.com/dvargastech11/tech11-relay-control/main/firmware/firmware.bin"
 
-// AP fallback mode (used whenever no WiFi is configured yet, or the
-// configured WiFi can't be reached)
+// AP fallback mode (used only when Ethernet isn't connected - lets a human
+// reach the setup/status page over WiFi, does NOT configure WiFi STA)
 #define AP_PASSWORD "SetupPass123"
 #define WIFI_CONNECT_TIMEOUT_MS 15000UL
+
+// Ethernet (LAN8720 PHY) pinout - matches the standard RMII wiring:
+// MDC->GPIO23, MDIO->GPIO18, clock fed into GPIO0 from the board's own
+// crystal (this board has no ESP32-controlled power-enable pin, hence -1).
+#define ETH_PHY_TYPE  ETH_PHY_LAN8720
+#define ETH_PHY_ADDR  0
+#define ETH_PHY_MDC   23
+#define ETH_PHY_MDIO  18
+#define ETH_PHY_POWER -1
+#define ETH_CLK_MODE  ETH_CLOCK_GPIO0_IN
 
 // ============================================================
 // Usually don't need to change these

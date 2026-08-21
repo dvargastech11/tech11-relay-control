@@ -2,6 +2,7 @@
 #include "config.h"
 #include "network_config.h"
 #include <WiFi.h>
+#include <ETH.h>
 #include <WiFiUdp.h>
 
 static WiFiUDP discoveryUdp;
@@ -19,7 +20,13 @@ void handleDiscoveryRequests() {
   incoming[len] = 0;
 
   if (strcmp(incoming, DISCOVERY_MESSAGE_EXPECTED) == 0) {
-    String reply = "{\"name\":\"" + deviceName + "\",\"ip\":\"" + WiFi.localIP().toString() +
+    // Discovery only ever runs when Ethernet is connected (main .ino gates
+    // setupDiscovery()/handleDiscoveryRequests() behind !isInAPMode), so
+    // report the Ethernet IP here - not WiFi.localIP(), which is
+    // meaningless now that there's no WiFi STA client mode in production.
+    // MAC stays as WiFi.macAddress() since that's what the API key and
+    // device name are derived from - must stay consistent across the codebase.
+    String reply = "{\"name\":\"" + deviceName + "\",\"ip\":\"" + ETH.localIP().toString() +
                    "\",\"mac\":\"" + WiFi.macAddress() + "\"}";
     discoveryUdp.beginPacket(discoveryUdp.remoteIP(), discoveryUdp.remotePort());
     discoveryUdp.write((const uint8_t*)reply.c_str(), reply.length());

@@ -12,19 +12,20 @@ extern IPAddress subnetMask;
 extern IPAddress dns1;
 extern IPAddress dns2;
 extern String ntpServer;
-extern String wifiSSID;
-extern String wifiPassword;
-extern bool isInAPMode;
+extern bool isInAPMode; // true = Ethernet not connected, hosting setup AP over WiFi
 
 String generateDeviceName();
 void ensureDeviceNameSet();
 void loadNetworkConfig();
 void saveNetworkConfig(String name, bool dhcp, String ip, String gw, String sn,
                         String dns1Str, String dns2Str, String ntpStr);
-void saveWifiCredentials(String ssid, String password);
-bool connectToWiFi();
+
+// Ethernet is the primary connection - WiFi is only used for the setup AP,
+// there is no WiFi STA client mode in production anymore.
+bool connectToEthernet();
+bool isEthernetConnected();
 void startFallbackAP();
-void setupWiFiWithFallback();
-void startBackgroundReconnectAttempt();
+void setupNetworkWithFallback();
+void startBackgroundEthernetRetry();
 
 #endif

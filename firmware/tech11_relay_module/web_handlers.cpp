@@ -28,8 +28,8 @@ static void handleRoot() {
           "a{color:#2d6cdf;} .banner{padding:12px;border-radius:8px;margin-bottom:16px;}</style></head><body>";
 
   html += "<div class='banner' style='background:" + String(isInAPMode ? "#7a1f1f" : "#1f4f2f") + ";'>";
-  html += isInAPMode ? "SETUP MODE - not connected to WiFi. Fix network settings below."
-                      : "Connected (" + wifiSSID + ") - IP: " + WiFi.localIP().toString();
+  html += isInAPMode ? "SETUP MODE - Ethernet not connected. Connect a cable, or check IP settings below."
+                      : "Connected via Ethernet - IP: " + ETH.localIP().toString();
   html += "</div>";
 
   html += "<h2>" + deviceName + "</h2>";
@@ -151,7 +151,7 @@ static void handleNetworkSavePage() {
   html += "<div class='field'><label><input type='radio' name='mode' value='static' " +
           String(!useDHCP ? "checked" : "") + "> Static IP</label></div>";
 
-  html += "<h3>Static IP Settings</h3>";
+  html += "<h3>Ethernet Static IP Settings</h3>";
   html += "<div class='field'><label>IP Address</label><input type='text' name='ip' value='" + staticIP.toString() + "'></div>";
   html += "<div class='field'><label>Gateway</label><input type='text' name='gw' value='" + gatewayIP.toString() + "'></div>";
   html += "<div class='field'><label>Subnet Mask</label><input type='text' name='sn' value='" + subnetMask.toString() + "'></div>";
@@ -161,9 +161,7 @@ static void handleNetworkSavePage() {
   html += "<h3>Time Sync (NTP)</h3>";
   html += "<div class='field'><label>NTP Server</label><input type='text' name='ntp' value='" + ntpServer + "' placeholder='pool.ntp.org'></div>";
 
-  html += "<h3>WiFi</h3>";
-  html += "<div class='field'><label>WiFi SSID</label><input type='text' name='ssid' value='" + wifiSSID + "'></div>";
-  html += "<div class='field'><label>WiFi Password (leave blank to keep current)</label><input type='password' name='wifipass' value=''></div>";
+  html += "<p style='color:#888;font-size:13px;'>This device connects via Ethernet only. WiFi is used solely as a fallback setup network when Ethernet isn't connected.</p>";
 
   html += "<button type='submit'>Save &amp; Reboot</button></form>";
   html += "<p><a href='/' style='color:#2d6cdf;'>&larr; Back</a></p></body></html>";
@@ -182,10 +180,6 @@ static void handleNetworkSave() {
   if (ntpArg.length() == 0) ntpArg = "pool.ntp.org"; // guard against an empty field
 
   saveNetworkConfig(name, dhcp, server.arg("ip"), server.arg("gw"), server.arg("sn"), dns1Arg, dns2Arg, ntpArg);
-
-  String newSsid = server.arg("ssid");
-  String newWifiPass = server.arg("wifipass");
-  if (newSsid.length() > 0) saveWifiCredentials(newSsid, newWifiPass);
 
   server.send(200, "text/html", "<body style='background:#1a1a1a;color:#eee;font-family:Arial;padding:40px;'>"
     "<h2>Saved. Rebooting...</h2></body>");
@@ -325,7 +319,6 @@ static void handleConfigBackup() {
   doc["dns1"] = dns1.toString();
   doc["dns2"] = dns2.toString();
   doc["ntpServer"] = ntpServer;
-  doc["wifiSSID"] = wifiSSID;
   doc["firmwareVersion"] = CURRENT_FIRMWARE_VERSION;
 
   String output;
@@ -367,9 +360,8 @@ static void handleConfigRestoreSubmit() {
     doc["subnet"] | subnetMask.toString(), doc["dns1"] | dns1.toString(),
     doc["dns2"] | dns2.toString(), doc["ntpServer"] | ntpServer
   );
-  if (doc["wifiSSID"]) saveWifiCredentials(doc["wifiSSID"].as<String>(), "");
 
-  server.send(200, "text/plain", "Restored. WiFi/admin passwords were not included - re-enter if needed. Rebooting...");
+  server.send(200, "text/plain", "Restored. Admin password was not included - re-enter if needed. Rebooting...");
   delay(1000);
   ESP.restart();
 }
@@ -438,14 +430,15 @@ static void handleStatus() {
 
   StaticJsonDocument<512> doc;
   doc["name"] = deviceName;
-  doc["ip"] = WiFi.localIP().toString();
-  doc["mac"] = WiFi.macAddress();
+  doc["ip"] = isInAPMode ? WiFi.softAPIP().toString() : ETH.localIP().toString();
+  doc["mac"] = WiFi.macAddress(); // API key + device name are derived from this MAC - must stay consistent with discovery.cpp and auth.cpp
   doc["firmwareVersion"] = CURRENT_FIRMWARE_VERSION;
   doc["uptimeSec"] = millis() / 1000;
   doc["useDHCP"] = useDHCP;
   doc["gateway"] = gatewayIP.toString();
   doc["subnet"] = subnetMask.toString();
-  doc["rssi"] = WiFi.RSSI();
+  doc["ethernetConnected"] = !isInAPMode;
+  doc["setupMode"] = isInAPMode;
 
   String output;
   serializeJson(doc, output);

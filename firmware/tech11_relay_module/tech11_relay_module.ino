@@ -4,20 +4,25 @@
   This file only contains setup()/loop(). All actual logic lives in the
   other files in this same sketch folder:
 
-    config.h            - all the CHANGE-THIS constants
-    network_config.*     - WiFi connect, AP fallback, saved settings
+    config.h            - all the CHANGE-THIS constants (incl. ETH pins)
+    network_config.*     - Ethernet primary connection, WiFi AP setup fallback
     auth.*                - admin login, forced password change, API key
-    relay_control.*      - relay pins and non-blocking activation
+    relay_control.*      - MCP23017-driven relays, board scan/online detect
     activity_log.*       - NTP timestamp + ring buffer log
     discovery.*           - UDP discovery responder
     ota_update.*          - GitHub OTA + rollback
     web_handlers.*        - every HTTP route handler
+
+  NETWORK ARCHITECTURE: Ethernet (LAN8720) is the primary connection. WiFi
+  is used ONLY as a fallback setup network when Ethernet isn't connected -
+  there is no WiFi STA client mode in production.
 
   Library dependencies (Arduino Library Manager):
     ArduinoJson (Benoit Blanchon)
 */
 
 #include <WiFi.h>
+#include <ETH.h>
 #include <WebServer.h>
 #include <ArduinoOTA.h>
 #include <Preferences.h>
@@ -43,9 +48,9 @@ void setup() {
   setupRelayPins();
   loadNetworkConfig();
   loadAuthConfig();
-  setupWiFiWithFallback();
+  setupNetworkWithFallback(); // tries Ethernet first, falls back to WiFi setup AP
 
-  ensureDeviceNameSet();  // MAC is only valid now that WiFi has initialized
+  ensureDeviceNameSet();  // MAC is only valid now that the network stack has initialized
   deviceApiKey = computeDeviceApiKey();
 
   if (!isInAPMode) {
@@ -68,7 +73,7 @@ void setup() {
   esp_ota_mark_app_valid_cancel_rollback();
 
   Serial.println("[SYS] " + deviceName + " ready. IP: " +
-                  (isInAPMode ? WiFi.softAPIP().toString() : WiFi.localIP().toString()));
+                  (isInAPMode ? WiFi.softAPIP().toString() : ETH.localIP().toString()));
 }
 
 void loop() {
@@ -88,23 +93,23 @@ void loop() {
       checkForUpdates(false);
     }
   } else {
-    // In AP fallback mode: periodically retry the originally configured
-    // WiFi in the background (AP stays up the whole time for setup access).
-    // If it connects, restart to cleanly re-enter normal operation -
-    // simpler and safer than trying to hot-swap discovery/OTA/NTP state
-    // at runtime.
+    // In AP fallback mode: periodically retry Ethernet in the background
+    // (the setup AP stays up the whole time so a human can still reach the
+    // device). If Ethernet connects, restart to cleanly re-enter normal
+    // operation - simpler and safer than trying to hot-swap
+    // discovery/OTA/NTP state at runtime.
     static unsigned long lastReconnectAttempt = 0;
-    const unsigned long RECONNECT_RETRY_INTERVAL_MS = 60UL * 1000; // every 60s
+    const unsigned long RECONNECT_RETRY_INTERVAL_MS = 15UL * 1000; // every 15s
     unsigned long now = millis();
 
     if (now - lastReconnectAttempt > RECONNECT_RETRY_INTERVAL_MS) {
       lastReconnectAttempt = now;
-      Serial.println("[WIFI] AP mode: attempting background reconnect to configured network...");
-      startBackgroundReconnectAttempt();
+      Serial.println("[NET] AP mode: checking for Ethernet link...");
+      startBackgroundEthernetRetry();
     }
 
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("[WIFI] Reconnected to configured network - restarting to fully exit AP mode...");
+    if (isEthernetConnected()) {
+      Serial.println("[NET] Ethernet connected - restarting to fully exit AP mode...");
       delay(500);
       ESP.restart();
     }
