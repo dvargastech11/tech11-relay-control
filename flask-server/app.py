@@ -741,10 +741,27 @@ def admin_remove_floor(building_id, elevator_number, floor_number):
 
 # ---- OTHER ADMIN-ONLY ROUTES (devices, Git pull, reboot) ----
 
-# Path to this repo's flask-server folder on the Pi, and the systemd
-# service name that runs it. Update these to match your actual deployment.
-REPO_DIR = "/home/admin/tech11-relay-control"
-SERVICE_NAME = "vyzcayne-elevator.service"
+import platform
+
+# Path to this repo's checkout on the server, and the service name that
+# runs it. Update these to match your actual deployment.
+#   Windows: REPO_DIR = r"C:\tech11-relay-control", SERVICE_NAME = the NSSM
+#            service name you used (e.g. "Tech11RelayServer")
+#   Linux:   REPO_DIR = "/home/admin/tech11-relay-control",
+#            SERVICE_NAME = "vyzcayne-elevator.service"
+REPO_DIR = r"C:\tech11-relay-control"
+SERVICE_NAME = "Tech11RelayServer"
+
+
+def _restart_service():
+    """Restarts the running service so a git pull's changes take effect.
+    Platform-aware: Windows Server uses NSSM-managed services (net stop/
+    start), Linux uses systemd."""
+    if platform.system() == "Windows":
+        subprocess.Popen(["net", "stop", SERVICE_NAME], shell=True)
+        subprocess.Popen(["net", "start", SERVICE_NAME], shell=True)
+    else:
+        subprocess.Popen(["sudo", "systemctl", "restart", SERVICE_NAME])
 
 
 @app.route("/admin/update-from-git", methods=["POST"])
@@ -759,9 +776,9 @@ def update_from_git():
             return jsonify({"success": False, "output": pull_result.stderr}), 500
 
         # The restart kills this very process mid-response on some systems -
-        # that's expected. systemd's Restart=on-failure brings it back up
-        # automatically within a second or two.
-        subprocess.Popen(["sudo", "systemctl", "restart", SERVICE_NAME])
+        # that's expected. The service manager (NSSM on Windows, systemd on
+        # Linux) brings it back up automatically within a second or two.
+        _restart_service()
 
         return jsonify({
             "success": True,

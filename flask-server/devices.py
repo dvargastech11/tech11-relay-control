@@ -30,31 +30,32 @@ def compute_device_api_key(mac_address):
 
 def _get_broadcast_addresses():
     """Returns directed broadcast addresses for every active IPv4 interface
-    on this Pi (e.g. the wired LAN's and the WiFi hotspot's), by parsing
-    `ip -4 -o addr show`. Falls back to the generic 255.255.255.255 alone
-    if this can't be determined - a plain broadcast to that address often
-    only reaches ONE interface's subnet on a multi-homed machine (usually
-    whichever one is the default route), which is why a device on the
-    other interface (e.g. the WiFi AP subnet) can go undiscovered."""
-    import subprocess
+    on this machine (e.g. the wired LAN's and any WiFi AP subnet), using
+    psutil for cross-platform interface enumeration (works on Windows and
+    Linux - the previous version shelled out to Linux's `ip` command, which
+    doesn't exist on Windows Server). Falls back to the generic
+    255.255.255.255 alone if this can't be determined - a plain broadcast
+    to that address often only reaches ONE interface's subnet on a
+    multi-homed machine (usually whichever one is the default route),
+    which is why a device on another interface can go undiscovered."""
     import ipaddress
+    import psutil
 
     broadcasts = set()
     try:
-        output = subprocess.check_output(
-            ["ip", "-4", "-o", "addr", "show"], text=True, timeout=2
-        )
-        for line in output.splitlines():
-            parts = line.split()
-            for i, token in enumerate(parts):
-                if "/" in token and token.count(".") == 3:
-                    try:
-                        iface = ipaddress.ip_interface(token)
-                        if not iface.ip.is_loopback:
-                            broadcasts.add(str(iface.network.broadcast_address))
-                    except ValueError:
-                        continue
-    except (subprocess.SubprocessError, FileNotFoundError, OSError):
+        for interfaces in psutil.net_if_addrs().values():
+            for addr in interfaces:
+                if addr.family.name != "AF_INET":  # IPv4 only
+                    continue
+                if not addr.address or not addr.netmask:
+                    continue
+                try:
+                    iface = ipaddress.ip_interface(f"{addr.address}/{addr.netmask}")
+                    if not iface.ip.is_loopback:
+                        broadcasts.add(str(iface.network.broadcast_address))
+                except ValueError:
+                    continue
+    except Exception:
         pass
 
     broadcasts.add("255.255.255.255")  # always include as a fallback
