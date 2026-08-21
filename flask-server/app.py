@@ -140,7 +140,11 @@ def home():
     # If there's only one building, skip the list and land directly on its
     # elevator control page - matches "land on the elevator control" intent.
     if len(buildings) == 1:
-        return redirect(url_for("building_view", building_id=buildings[0]["id"]))
+        return redirect(url_for(
+            "building_view",
+            building_id=buildings[0]["id"],
+            **request.args  # preserves ?operator_view=1 through this redirect
+        ))
 
     return render_template("home.html", active_page="home", buildings=buildings)
 

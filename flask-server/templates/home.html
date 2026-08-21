@@ -8,7 +8,7 @@
 
   <div style="max-width:500px; margin:0 auto; display:flex; flex-direction:column; gap:12px;">
     {% for b in buildings %}
-      <a href="/building/{{ b.id }}" style="display:block; background:#262626; color:#eee; text-decoration:none;
+      <a href="/building/{{ b.id }}{{ '?operator_view=1' if request.args.get('operator_view') else '' }}" style="display:block; background:#262626; color:#eee; text-decoration:none;
         padding:16px; border-radius:10px; font-weight:bold;">
         {{ b.name }}
         <div style="color:#888; font-weight:normal; font-size:13px; margin-top:4px;">

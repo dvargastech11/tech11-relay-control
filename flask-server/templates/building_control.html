@@ -8,7 +8,7 @@
   {% if all_buildings|length > 1 %}
   <div style="margin-bottom:20px;">
     {% for b in all_buildings %}
-      <a href="/building/{{ b.id }}" style="color:{{ '#2fbf4f' if b.id == building.id else '#2d6cdf' }}; margin:0 8px;">{{ b.name }}</a>
+      <a href="/building/{{ b.id }}{{ '?operator_view=1' if request.args.get('operator_view') else '' }}" style="color:{{ '#2fbf4f' if b.id == building.id else '#2d6cdf' }}; margin:0 8px;">{{ b.name }}</a>
     {% endfor %}
   </div>
   {% endif %}
