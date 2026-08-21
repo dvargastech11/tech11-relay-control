@@ -16,14 +16,19 @@ String deviceApiKey;
 String computeDeviceApiKey() {
   String mac = WiFi.macAddress();
   const mbedtls_md_info_t *mdInfo = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-  mbedtls_md_context_t ctx;
-  mbedtls_md_init(&ctx);
-  mbedtls_md_setup(&ctx, mdInfo, 1);
-  mbedtls_md_hmac_starts(&ctx, (const unsigned char*)MASTER_SECRET, strlen(MASTER_SECRET));
-  mbedtls_md_hmac_update(&ctx, (const unsigned char*)mac.c_str(), mac.length());
+
+  // One-shot HMAC call - avoids the separate mbedtls_md_hmac_starts/update/
+  // finish streaming functions, which some newer mbedtls versions (bundled
+  // with newer/alpha ESP32 cores) have removed or renamed. This single
+  // function has been stable across mbedtls versions and needs no manual
+  // context setup/teardown.
   unsigned char result[32];
-  mbedtls_md_hmac_finish(&ctx, result);
-  mbedtls_md_free(&ctx);
+  mbedtls_md_hmac(
+    mdInfo,
+    (const unsigned char*)MASTER_SECRET, strlen(MASTER_SECRET),
+    (const unsigned char*)mac.c_str(), mac.length(),
+    result
+  );
 
   String hex = "";
   char buf[3];
