@@ -287,17 +287,22 @@ def send_relay_command(device_ip, device_mac, relay_num, duration_ms):
         return False, f"Module unreachable: {e}"
 
 
-# ---- PUBLIC CONTROL ROUTES (both admin and operator) ----
+# ---- PUBLIC CONTROL ROUTES (no login required - this is the "operator" experience) ----
 
 @app.route("/")
-@login_required
 def home():
     data = bstore.load_data()
-    return render_template("home.html", active_page="home", buildings=data["buildings"])
+    buildings = data["buildings"]
+
+    # If there's only one building, skip the list and land directly on its
+    # elevator control page - matches "land on the elevator control" intent.
+    if len(buildings) == 1:
+        return redirect(url_for("building_view", building_id=buildings[0]["id"]))
+
+    return render_template("home.html", active_page="home", buildings=buildings)
 
 
 @app.route("/building/<building_id>")
-@login_required
 def building_view(building_id):
     data = bstore.load_data()
     building = bstore.get_building(data, building_id)
@@ -320,7 +325,6 @@ def building_view(building_id):
 
 
 @app.route("/activate/<building_id>/<elevator_number>/<int:floor_number>/<int:duration_ms>")
-@login_required
 def activate(building_id, elevator_number, floor_number, duration_ms):
     data = bstore.load_data()
     building = bstore.get_building(data, building_id)

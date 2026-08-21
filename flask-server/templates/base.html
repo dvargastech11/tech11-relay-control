@@ -39,6 +39,24 @@
     nav a.active {
       background: #2fbf4f;
     }
+    #admin-login-corner {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+    }
+    #admin-login-corner a {
+      color: #888;
+      text-decoration: none;
+      font-size: 12px;
+      padding: 8px 14px;
+      border: 1px solid #444;
+      border-radius: 6px;
+      background: #262626;
+    }
+    #admin-login-corner a:hover {
+      color: #eee;
+      border-color: #666;
+    }
     h1 {
       margin: 10px 0 30px;
       font-size: 26px;
@@ -52,6 +70,12 @@
   </style>
 </head>
 <body>
+
+  {% if not current_user.is_authenticated %}
+  <div id="admin-login-corner">
+    <a href="/login">Log in as Admin</a>
+  </div>
+  {% endif %}
 
   <nav>
     <a href="/" class="{{ 'active' if active_page == 'home' else '' }}">Home</a>
