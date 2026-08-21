@@ -44,9 +44,17 @@
 #define GMT_OFFSET_SEC (-5 * 3600)  // EST - adjust for your timezone
 #define DAYLIGHT_OFFSET_SEC 3600
 
-// Relays (test config - 2 relays; scale up for real MCP23017 boards)
-#define NUM_RELAYS 2
+// Relays - PRODUCTION config: 47 channels across 3x MCP23017 I2C expanders
+// (16 channels each, 48 available, 47 used - matches one elevator's floor
+// count). Replaces the earlier 2-relay direct-GPIO test config.
+#define NUM_RELAYS 47
 #define RELAY_ACTIVE_LEVEL HIGH
 #define RELAY_INACTIVE_LEVEL LOW
+
+// I2C addresses for the 3 MCP23017 boards - set via each board's onboard
+// address DIP switch/jumpers to match these exactly.
+#define MCP23017_ADDR_1 0x20  // relays 1-16
+#define MCP23017_ADDR_2 0x21  // relays 17-32
+#define MCP23017_ADDR_3 0x22  // relays 33-47 (only 15 of 16 channels used)
 
 #endif
