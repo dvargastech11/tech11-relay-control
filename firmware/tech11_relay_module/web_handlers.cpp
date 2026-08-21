@@ -34,9 +34,31 @@ static void handleRoot() {
 
   html += "<h2>" + deviceName + "</h2>";
 
-  html += "<h3>Relay Test</h3>";
-  for (int i = 1; i <= NUM_RELAYS; i++) {
-    html += "<button onclick=\"trig(" + String(i) + ")\">Test Relay " + String(i) + "</button>";
+  html += "<h3>Relay Test (48 channels, 3 boards)</h3>";
+  scanMCPBoards(); // re-check board presence each time this page loads
+  for (int b = 0; b < NUM_MCP_BOARDS; b++) {
+    bool online = isBoardOnline(b);
+    html += "<div style='margin-bottom:14px;'>";
+    html += "<div style='font-size:13px;color:#aaa;margin-bottom:6px;'>";
+    html += "<span style='display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:";
+    html += online ? "#2fbf4f" : "#e74c3c";
+    html += ";'></span>";
+    html += "Board " + String(b + 1) + " (0x" + String(getBoardAddress(b), HEX) + ") - ";
+    html += online ? "online" : "not detected";
+    html += "</div>";
+
+    for (int p = 0; p < 16; p++) {
+      int channelNum = b * 16 + p + 1;
+      bool inUse = channelNum <= NUM_RELAYS;
+      String label = "Ch " + String(channelNum) + (inUse ? "" : " (spare)");
+      if (online) {
+        html += "<button onclick=\"trigDiag(" + String(channelNum) + ")\" style='" +
+                String(inUse ? "" : "background:#555;") + "'>" + label + "</button>";
+      } else {
+        html += "<button disabled style='background:#333;color:#666;'>" + label + "</button>";
+      }
+    }
+    html += "</div>";
   }
   html += "<div id='status' style='color:#aaa;margin-top:10px;'></div>";
 
@@ -55,8 +77,8 @@ static void handleRoot() {
   html += "<div id='updateStatus' style='color:#aaa;margin-top:8px;'></div>";
 
   html += "<script>";
-  html += "async function trig(n){document.getElementById('status').innerText='Sending relay '+n+'...';"
-          "try{const r=await fetch('/trigger',{method:'POST',headers:{'Content-Type':'application/json','X-API-Key':'" + deviceApiKey + "'},body:JSON.stringify({relay:n})});"
+  html += "async function trigDiag(n){document.getElementById('status').innerText='Sending channel '+n+'...';"
+          "try{const r=await fetch('/diag/trigger?channel='+n+'&duration=5000',{method:'POST'});"
           "document.getElementById('status').innerText=await r.text();}catch(e){document.getElementById('status').innerText='Error: '+e;}}";
   html += "async function checkUpdate(){document.getElementById('updateStatus').innerText='Checking...';"
           "const r=await fetch('/update/check');document.getElementById('updateStatus').innerText=await r.text();}";
@@ -384,6 +406,33 @@ static void handleTrigger() {
   server.send(200, "application/json", "{\"status\":\"success\",\"triggered_relay\":" + String(relayNum) + "}");
 }
 
+// Diagnostic-only channel test - human admin login (not API key), allows
+// testing all 48 physical channels including the spare one beyond
+// NUM_RELAYS. Used by the management page's per-board test grid.
+static void handleDiagTrigger() {
+  if (!checkAuth()) return;
+
+  if (!server.hasArg("channel") || !server.hasArg("duration")) {
+    server.send(400, "text/plain", "Missing channel or duration parameter");
+    return;
+  }
+
+  int channel = server.arg("channel").toInt();
+  long duration = server.arg("duration").toInt();
+
+  if (channel < 1 || channel > HARDWARE_CHANNELS) {
+    server.send(400, "text/plain", "Channel out of range (1-" + String(HARDWARE_CHANNELS) + ")");
+    return;
+  }
+  if (duration <= 0) {
+    server.send(400, "text/plain", "Invalid duration");
+    return;
+  }
+
+  activateChannelDiag(channel, duration);
+  server.send(200, "text/plain", "OK: channel " + String(channel) + " activated for " + String(duration) + "ms");
+}
+
 static void handleStatus() {
   if (!checkApiKey()) return;
 
@@ -461,6 +510,7 @@ void registerWebHandlers() {
   server.on("/config/restore", HTTP_POST, handleConfigRestoreSubmit);
 
   server.on("/trigger", HTTP_POST, handleTrigger);
+  server.on("/diag/trigger", HTTP_POST, handleDiagTrigger);
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/reboot", HTTP_POST, handleRebootCommand);
   server.on("/network/api-save", HTTP_POST, handleApiNetworkSave);
