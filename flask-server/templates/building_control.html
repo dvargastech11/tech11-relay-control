@@ -18,7 +18,7 @@
       <div class="elevator-col">
         <div class="elevator-col-title">Elevator {{ elevator.elevator_number }}</div>
         {% if not elevator.device_ip %}
-          <div style="color:#e74c3c; font-size:12px;">No device assigned</div>
+          <div style="grid-column: 1 / -1; color:#e74c3c; font-size:12px;">No device assigned</div>
         {% endif %}
         {% for floor in elevator.floors %}
           <button
@@ -42,12 +42,13 @@
       background: #262626;
       border-radius: 10px;
       padding: 16px 10px;
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
       gap: 8px;
-      min-width: 110px;
+      min-width: 160px;
     }
     .elevator-col-title {
+      grid-column: 1 / -1;
       font-size: 14px;
       font-weight: bold;
       color: #aaa;
