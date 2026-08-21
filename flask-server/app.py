@@ -1,25 +1,27 @@
 """
-Tech 11 Relay Control System - Flask Server (single Pi, both towers)
+Tech 11 Relay Control System - Flask Server
 ---------------------------------------------------------------------------------
-This Pi lives in the MDF and controls all 12 elevator modules (6 in NT tower,
-6 in ST tower) over the building's network backbone via HTTP/WiFi.
+Controls elevator modules over HTTP/WiFi. Elevator control pages are fully
+public (no login) - the "operator" experience. Admin access (device
+management, building/floor config, etc.) requires logging in with a real
+Windows account on this server via the "Log in as Admin" button.
 
 Install dependencies first (inside the venv):
-    python -m pip install flask requests flask-login werkzeug
+    python -m pip install flask requests flask-login werkzeug pywin32
 
 Run with:
     python app.py
 
-Then open http://<this-pi-ip>:5000 in your browser.
+Then open http://<server-ip>:5000 in your browser.
 
-DEFAULT LOGINS (must be changed on first login - enforced automatically):
-    admin    / T1123456   - full access (devices, config, Git pull, reboot)
-    operator / T1123456   - floor buttons only
+ADMIN LOGIN: any local Windows account on this server that is a member of
+the local "Administrators" group. Password is validated against Windows
+itself (see windows_auth.py) - there is no separate app-level password to
+manage or reset; use Windows' own user management (Computer Management >
+Local Users and Groups) to add/remove/change passwords for admin accounts.
 """
 
-import json
 import os
-import shutil
 import subprocess
 from functools import wraps
 import requests
@@ -28,7 +30,7 @@ from flask_login import (
     LoginManager, UserMixin, login_user, logout_user,
     login_required, current_user
 )
-from werkzeug.security import generate_password_hash, check_password_hash
+import windows_auth
 
 app = Flask(__name__)
 app.secret_key = "CHANGE-THIS-TO-A-RANDOM-SECRET-BEFORE-PRODUCTION"
@@ -37,83 +39,33 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
-# ---- USER STORE (persisted to disk so password changes survive restarts) ----
-# Stored OUTSIDE the git repo folder, same reasoning as buildings.json in
-# building_store.py - a `git pull` can never touch this location.
-_DATA_DIR = os.path.expanduser("~/tech11-data")
-USERS_FILE = os.path.join(_DATA_DIR, "users.json")
-_OLD_USERS_FILE = "users.json"  # previous in-repo location, migrated once below
-
-DEFAULT_USERS = {
-    "admin": {
-        "password_hash": generate_password_hash("T1123456"),
-        "role": "admin",
-        "must_change_password": True,
-    },
-    "operator": {
-        "password_hash": generate_password_hash("T1123456"),
-        "role": "operator",
-        "must_change_password": True,
-    },
-}
-
-
-def load_users():
-    os.makedirs(_DATA_DIR, exist_ok=True)
-    if not os.path.exists(USERS_FILE) and os.path.exists(_OLD_USERS_FILE):
-        shutil.copy2(_OLD_USERS_FILE, USERS_FILE)  # one-time migration
-
-    if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, "r") as f:
-            return json.load(f)
-    save_users(DEFAULT_USERS)
-    return DEFAULT_USERS
-
-
-def save_users(users_dict):
-    os.makedirs(_DATA_DIR, exist_ok=True)
-    with open(USERS_FILE, "w") as f:
-        json.dump(users_dict, f, indent=2)
-
-
-USERS = load_users()
-
 
 class User(UserMixin):
-    def __init__(self, username, role, must_change_password):
+    """A logged-in admin session. Only Windows accounts in the local
+    Administrators group can ever reach a successful login (see login()
+    below), so role is always 'admin' for any session that exists at all."""
+    def __init__(self, username):
         self.id = username
-        self.role = role
-        self.must_change_password = must_change_password
+        self.role = "admin"
 
 
 @login_manager.user_loader
 def load_user(username):
-    record = USERS.get(username)
-    if not record:
-        return None
-    return User(username, record["role"], record["must_change_password"])
+    # Re-validating Windows group membership on every request would be
+    # expensive; we trust the session once login() has verified it. If an
+    # account is removed from Administrators mid-session, they keep access
+    # until they log out - acceptable for this deployment's threat model.
+    return User(username)
 
 
 def admin_required(f):
-    """Route decorator: must be logged in AND have the admin role."""
+    """Route decorator: must be logged in (which, by construction, always
+    means a verified local Windows admin - see login())."""
     @wraps(f)
     @login_required
     def wrapper(*args, **kwargs):
-        if current_user.role != "admin":
-            return jsonify({"success": False, "error": "Admin access required"}), 403
         return f(*args, **kwargs)
     return wrapper
-
-
-@app.before_request
-def enforce_password_change():
-    """Redirect any authenticated request to /change-password until the
-    user has replaced their default password - applies to both roles."""
-    if not current_user.is_authenticated:
-        return
-    allowed_endpoints = {"change_password", "logout", "static"}
-    if current_user.must_change_password and request.endpoint not in allowed_endpoints:
-        return redirect(url_for("change_password"))
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -121,14 +73,15 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "")
         password = request.form.get("password", "")
-        record = USERS.get(username)
 
-        if record and check_password_hash(record["password_hash"], password):
-            login_user(User(username, record["role"], record["must_change_password"]))
+        if not windows_auth.validate_windows_credentials(username, password):
+            flash("Invalid Windows username or password.")
+        elif not windows_auth.is_local_admin(username):
+            flash("That account is valid but is not a member of the local Administrators group.")
+        else:
+            login_user(User(username))
             next_page = request.args.get("next") or url_for("home")
             return redirect(next_page)
-
-        flash("Invalid username or password.")
 
     return render_template("login.html")
 
@@ -138,118 +91,6 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for("login"))
-
-
-@app.route("/change-password", methods=["GET", "POST"])
-@login_required
-def change_password():
-    if request.method == "POST":
-        new_password = request.form.get("newpass", "")
-        confirm_password = request.form.get("confirmpass", "")
-
-        if len(new_password) < 8:
-            flash("Password must be at least 8 characters.")
-        elif new_password != confirm_password:
-            flash("Passwords do not match.")
-        else:
-            USERS[current_user.id]["password_hash"] = generate_password_hash(new_password)
-            USERS[current_user.id]["must_change_password"] = False
-            save_users(USERS)
-            current_user.must_change_password = False
-            flash("Password updated.")
-            return redirect(url_for("home"))
-
-    return render_template(
-        "change_password.html",
-        forced=current_user.must_change_password,
-    )
-
-
-def _count_admins():
-    return sum(1 for u in USERS.values() if u["role"] == "admin")
-
-
-@app.route("/admin/users")
-@admin_required
-def admin_users():
-    users_list = [
-        {"username": username, "role": rec["role"], "must_change_password": rec["must_change_password"]}
-        for username, rec in USERS.items()
-    ]
-    return render_template("admin_users.html", active_page="admin_users", users=users_list)
-
-
-@app.route("/admin/users/new", methods=["POST"])
-@admin_required
-def admin_users_new():
-    username = request.form.get("username", "").strip()
-    password = request.form.get("password", "")
-    role = request.form.get("role", "operator")
-
-    if not username or not password:
-        flash("Username and password are both required.")
-    elif username in USERS:
-        flash(f"User '{username}' already exists.")
-    elif len(password) < 8:
-        flash("Password must be at least 8 characters.")
-    elif role not in ("admin", "operator"):
-        flash("Invalid role.")
-    else:
-        USERS[username] = {
-            "password_hash": generate_password_hash(password),
-            "role": role,
-            "must_change_password": True,
-        }
-        save_users(USERS)
-        flash(f"User '{username}' created. They'll be prompted to change their password on first login.")
-
-    return redirect(url_for("admin_users"))
-
-
-@app.route("/admin/users/<username>/update", methods=["POST"])
-@admin_required
-def admin_users_update(username):
-    if username not in USERS:
-        flash("User not found.")
-        return redirect(url_for("admin_users"))
-
-    new_role = request.form.get("role")
-    new_password = request.form.get("new_password", "").strip()
-
-    if new_role and new_role != USERS[username]["role"]:
-        if USERS[username]["role"] == "admin" and new_role != "admin" and _count_admins() <= 1:
-            flash("Cannot change the last remaining admin to operator - at least one admin must exist.")
-            return redirect(url_for("admin_users"))
-        USERS[username]["role"] = new_role
-
-    if new_password:
-        if len(new_password) < 8:
-            flash("New password must be at least 8 characters - role change (if any) was still applied.")
-            save_users(USERS)
-            return redirect(url_for("admin_users"))
-        USERS[username]["password_hash"] = generate_password_hash(new_password)
-        USERS[username]["must_change_password"] = True
-
-    save_users(USERS)
-    flash(f"User '{username}' updated.")
-    return redirect(url_for("admin_users"))
-
-
-@app.route("/admin/users/<username>/delete", methods=["POST"])
-@admin_required
-def admin_users_delete(username):
-    if username not in USERS:
-        flash("User not found.")
-    elif username == current_user.id:
-        flash("You can't delete your own account while logged in as it.")
-    elif USERS[username]["role"] == "admin" and _count_admins() <= 1:
-        flash("Cannot delete the last remaining admin.")
-    else:
-        del USERS[username]
-        save_users(USERS)
-        flash(f"User '{username}' deleted.")
-
-    return redirect(url_for("admin_users"))
 
 
 import building_store as bstore
