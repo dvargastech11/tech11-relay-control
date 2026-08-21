@@ -36,8 +36,12 @@ void loadNetworkConfig() {
   dns1.fromString(prefs.getString("dns1", dns1.toString()));
   dns2.fromString(prefs.getString("dns2", dns2.toString()));
   ntpServer = prefs.getString("ntp", NTP_SERVER);
-  wifiSSID = prefs.getString("wifissid", DEFAULT_WIFI_SSID);
-  wifiPassword = prefs.getString("wifipass", DEFAULT_WIFI_PASSWORD);
+  // Empty defaults (not a hardcoded network) - a fresh device with no
+  // saved credentials will fail to connect immediately and fall into AP
+  // fallback mode, which is the intended "always starts in AP mode until
+  // configured" behavior for base firmware.
+  wifiSSID = prefs.getString("wifissid", "");
+  wifiPassword = prefs.getString("wifipass", "");
   prefs.end();
   // NOTE: device name auto-generation (if empty) now happens in
   // ensureDeviceNameSet(), called AFTER WiFi is initialized - the MAC

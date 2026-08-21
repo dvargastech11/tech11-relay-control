@@ -5,10 +5,16 @@
 // CHANGE THESE BEFORE FLASHING / BEFORE PRODUCTION
 // ============================================================
 
-// First-boot WiFi defaults only - overwritten once saved via the
-// management page or AP setup mode.
-#define DEFAULT_WIFI_SSID "YOUR_WIFI_SSID"
-#define DEFAULT_WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+// NOTE: There is deliberately NO hardcoded default WiFi SSID/password here.
+// This firmware is meant to be identical "base firmware" across every
+// device - a fresh, unconfigured device has no saved WiFi credentials in
+// its NVS storage, so it always comes up in AP fallback mode on first
+// boot. WiFi is then configured once through the AP setup portal (or the
+// normal Network Settings page once connected) and saved to NVS via the
+// Preferences library - a completely separate flash partition from the
+// firmware code itself. Future firmware updates (OTA or Pi-initiated
+// push) only replace the code partition, so saved WiFi config always
+// survives an update untouched.
 
 // Must match MASTER_SECRET in the Flask server's devices.py EXACTLY.
 #define MASTER_SECRET "Tech11-Master-Secret-ChangeThisBeforeProduction-2026"
@@ -18,7 +24,8 @@
 #define GITHUB_VERSION_URL  "https://raw.githubusercontent.com/dvargastech11/tech11-relay-control/main/firmware/version.txt"
 #define GITHUB_FIRMWARE_URL "https://raw.githubusercontent.com/dvargastech11/tech11-relay-control/main/firmware/firmware.bin"
 
-// AP fallback mode (used when WiFi connect fails)
+// AP fallback mode (used whenever no WiFi is configured yet, or the
+// configured WiFi can't be reached)
 #define AP_PASSWORD "SetupPass123"
 #define WIFI_CONNECT_TIMEOUT_MS 15000UL
 
