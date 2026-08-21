@@ -39,4 +39,12 @@
     <button type="submit" style="padding:10px 20px; border:none; border-radius:8px;
       background:#2d6cdf; color:white; cursor:pointer; font-weight:bold;">+ Add Elevator</button>
   </form>
+
+  <div style="max-width:500px; margin:40px auto 0; border-top:1px solid #333; padding-top:20px;">
+    <form method="POST" action="/admin/buildings/{{ building.id }}/delete"
+      onsubmit="return confirm('Delete {{ building.name }} and ALL its elevators and floors? This cannot be undone.');">
+      <button type="submit" style="padding:10px 20px; border:none; border-radius:8px;
+        background:#7a1f1f; color:white; cursor:pointer;">Delete This Building</button>
+    </form>
+  </div>
 {% endblock %}

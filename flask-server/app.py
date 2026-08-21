@@ -430,6 +430,21 @@ def admin_building_detail(building_id):
     return render_template("admin_building_detail.html", building=building, active_page="admin_buildings")
 
 
+@app.route("/admin/buildings/<building_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_building(building_id):
+    data = bstore.load_data()
+    building = bstore.get_building(data, building_id)
+    if not building:
+        flash("Building not found.")
+        return redirect(url_for("admin_buildings"))
+
+    building_name = building["name"]
+    bstore.delete_building(data, building_id)
+    flash(f"Building '{building_name}' deleted, along with all its elevators and floors.")
+    return redirect(url_for("admin_buildings"))
+
+
 @app.route("/admin/buildings/<building_id>/elevators/new", methods=["POST"])
 @admin_required
 def admin_add_elevator(building_id):

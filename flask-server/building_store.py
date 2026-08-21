@@ -115,6 +115,19 @@ def rename_building(data, building_id, new_name):
     return building
 
 
+def delete_building(data, building_id):
+    """Removes a building entirely (all its elevators/floors go with it).
+    No safeguard against deleting the last remaining building - an empty
+    building list is a valid state, the home page just shows a
+    'no buildings configured' message in that case."""
+    building = get_building(data, building_id)
+    if not building:
+        return False
+    data["buildings"] = [b for b in data["buildings"] if b["id"] != building_id]
+    save_data(data)
+    return True
+
+
 def add_elevator(data, building_id, elevator_number):
     building = get_building(data, building_id)
     if not building:
