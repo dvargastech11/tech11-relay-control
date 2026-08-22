@@ -19,8 +19,9 @@
 #define GITHUB_VERSION_URL  "https://raw.githubusercontent.com/dvargastech11/tech11-relay-control/main/firmware/version.txt"
 #define GITHUB_FIRMWARE_URL "https://raw.githubusercontent.com/dvargastech11/tech11-relay-control/main/firmware/firmware.bin"
 
-// AP fallback mode (used only when Ethernet isn't connected - lets a human
-// reach the setup/status page over WiFi, does NOT configure WiFi STA)
+// AP fallback mode - currently OPEN (no password), see network_config.cpp's
+// startFallbackAP(). AP_PASSWORD below is unused but kept in case password
+// protection on the setup network is wanted again later.
 #define AP_PASSWORD "SetupPass123"
 #define WIFI_CONNECT_TIMEOUT_MS 15000UL
 

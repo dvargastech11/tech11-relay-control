@@ -121,7 +121,7 @@ void startFallbackAP() {
   String apSsid = "Tech11-Setup-" + deviceName.substring(deviceName.length() - 4);
   WiFi.mode(WIFI_AP_STA); // AP_STA so background reconnect attempts can run while the setup AP stays up
   WiFi.softAPConfig(apIP, apGateway, apSubnet);
-  WiFi.softAP(apSsid.c_str(), AP_PASSWORD);
+  WiFi.softAP(apSsid.c_str()); // no password - open network for easier setup access
   Serial.println("[WIFI] AP fallback active: " + apSsid + " @ " + WiFi.softAPIP().toString());
 }
 

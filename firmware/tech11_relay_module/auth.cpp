@@ -10,8 +10,8 @@ extern WebServer server;   // defined in the main .ino
 extern Preferences prefs;  // defined in the main .ino
 
 const char* ADMIN_USERNAME = "admin";
-String adminPassword = "T1123456";
-bool mustChangePassword = true;
+String adminPassword = "12345678";
+bool mustChangePassword = false; // no longer forced - see checkForcedPasswordChange() below
 String deviceApiKey;
 
 String computeDeviceApiKey() {
@@ -88,8 +88,8 @@ String computeDeviceApiKey() {
 
 void loadAuthConfig() {
   prefs.begin("auth", true);
-  adminPassword = prefs.getString("password", "T1123456");
-  mustChangePassword = prefs.getBool("mustchange", true);
+  adminPassword = prefs.getString("password", "12345678");
+  mustChangePassword = prefs.getBool("mustchange", false);
   prefs.end();
 }
 
@@ -109,11 +109,9 @@ bool checkAuth() {
 }
 
 bool checkForcedPasswordChange() {
-  if (mustChangePassword) {
-    server.sendHeader("Location", "/change-password");
-    server.send(302);
-    return true;
-  }
+  // Password changes are no longer forced - this always returns false.
+  // The /change-password page still exists and works if someone wants to
+  // change the password voluntarily, it's just never required.
   return false;
 }
 
