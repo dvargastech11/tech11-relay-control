@@ -145,7 +145,8 @@ if (-not (Test-Path "venv")) {
 }
 
 & ".\venv\Scripts\python.exe" -m pip install --upgrade pip --quiet
-& ".\venv\Scripts\python.exe" -m pip install flask requests flask-login werkzeug waitress psutil --quiet
+& ".\venv\Scripts\python.exe" -m pip install flask requests flask-login werkzeug waitress psutil pywin32 --quiet
+& ".\venv\Scripts\python.exe" ".\venv\Scripts\pywin32_postinstall.py" -install
 
 Write-Host "Dependencies installed." -ForegroundColor Green
 Pop-Location
