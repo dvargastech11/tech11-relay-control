@@ -37,7 +37,7 @@
         </td>
         <td style="padding:8px;">{{ d.name }}</td>
         <td style="padding:8px;">{{ d.building_name }} - Elevator {{ d.elevator_number }}</td>
-        <td style="padding:8px;">{{ d.ip }}</td>
+        <td style="padding:8px;"><a href="http://{{ d.ip }}" target="_blank" style="color:#2d6cdf;">{{ d.ip }}</a></td>
         <td style="padding:8px;">{{ (d.status.uptimeSec ~ 's') if d.online and d.status else '-' }}</td>
         <td style="padding:8px; white-space:nowrap;">
           <button onclick="reboot('{{ d.ip }}','{{ d.mac }}')" style="padding:6px 10px; border:none;
