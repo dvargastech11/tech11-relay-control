@@ -168,3 +168,134 @@ void updateRelayTimers() {
     }
   }
 }
+
+// ============================================================
+// Test modes (continuous - not single-shot)
+// ============================================================
+
+enum TestMode { TEST_NONE, TEST_ALL_ON, TEST_ALL_OFF, TEST_CYCLE_ALL, TEST_CYCLE_CHANNEL, TEST_CYCLE_BOARD };
+
+static TestMode currentTestMode = TEST_NONE;
+static int testHoldMs = 1000;
+static int testTargetChannel = 1;   // 1-indexed, used by TEST_CYCLE_CHANNEL
+static int testTargetBoard = 0;     // 0-indexed, used by TEST_CYCLE_BOARD
+static bool testCycleOn = false;    // current phase of the cycle (true = energized)
+static unsigned long testLastToggle = 0;
+
+// Directly sets one channel's physical state, bypassing the normal
+// single-shot timer array entirely - used by all test mode functions.
+static void setChannelDirect(int channelNum, bool active) {
+  uint8_t address, reg, bit;
+  int boardIndex;
+  resolveChannel(channelNum, address, reg, bit, boardIndex);
+  if (!isBoardOnline(boardIndex)) return;
+  setChannelBit(address, reg, bit, active ? (RELAY_ACTIVE_LEVEL == HIGH) : (RELAY_INACTIVE_LEVEL == HIGH));
+}
+
+static void setAllChannelsDirect(bool active) {
+  for (int ch = 1; ch <= HARDWARE_CHANNELS; ch++) {
+    setChannelDirect(ch, active);
+  }
+}
+
+static void setBoardChannelsDirect(int boardIndex, bool active) {
+  for (int p = 0; p < 16; p++) {
+    int channelNum = boardIndex * 16 + p + 1;
+    setChannelDirect(channelNum, active);
+  }
+}
+
+void startTestAllOn() {
+  stopTestMode();
+  setAllChannelsDirect(true);
+  currentTestMode = TEST_ALL_ON;
+  addLog("OUT", "Test mode: ALL ON (holding)");
+}
+
+void startTestAllOff() {
+  stopTestMode();
+  setAllChannelsDirect(false);
+  currentTestMode = TEST_ALL_OFF;
+  addLog("OUT", "Test mode: ALL OFF (holding)");
+}
+
+void startTestCycleAll(int holdMs) {
+  stopTestMode();
+  currentTestMode = TEST_CYCLE_ALL;
+  testHoldMs = holdMs;
+  testCycleOn = true;
+  testLastToggle = millis();
+  setAllChannelsDirect(true);
+  addLog("OUT", "Test mode: cycling ALL every " + String(holdMs) + "ms");
+}
+
+void startTestCycleChannel(int channel1to48, int holdMs) {
+  stopTestMode();
+  currentTestMode = TEST_CYCLE_CHANNEL;
+  testTargetChannel = channel1to48;
+  testHoldMs = holdMs;
+  testCycleOn = true;
+  testLastToggle = millis();
+  setChannelDirect(channel1to48, true);
+  addLog("OUT", "Test mode: cycling channel #" + String(channel1to48) + " every " + String(holdMs) + "ms");
+}
+
+void startTestCycleBoard(int boardIndex, int holdMs) {
+  stopTestMode();
+  currentTestMode = TEST_CYCLE_BOARD;
+  testTargetBoard = boardIndex;
+  testHoldMs = holdMs;
+  testCycleOn = true;
+  testLastToggle = millis();
+  setBoardChannelsDirect(boardIndex, true);
+  addLog("OUT", "Test mode: cycling board " + String(boardIndex + 1) + " every " + String(holdMs) + "ms");
+}
+
+void stopTestMode() {
+  if (currentTestMode == TEST_NONE) return;
+
+  switch (currentTestMode) {
+    case TEST_ALL_ON:
+    case TEST_ALL_OFF:
+    case TEST_CYCLE_ALL:
+      setAllChannelsDirect(false);
+      break;
+    case TEST_CYCLE_CHANNEL:
+      setChannelDirect(testTargetChannel, false);
+      break;
+    case TEST_CYCLE_BOARD:
+      setBoardChannelsDirect(testTargetBoard, false);
+      break;
+    default:
+      break;
+  }
+
+  currentTestMode = TEST_NONE;
+  addLog("OUT", "Test mode stopped, relays OFF");
+}
+
+void updateTestMode() {
+  if (currentTestMode == TEST_NONE || currentTestMode == TEST_ALL_ON || currentTestMode == TEST_ALL_OFF) {
+    return; // hold modes don't need periodic toggling
+  }
+
+  unsigned long now = millis();
+  if (now - testLastToggle < (unsigned long)testHoldMs) return;
+
+  testLastToggle = now;
+  testCycleOn = !testCycleOn;
+
+  switch (currentTestMode) {
+    case TEST_CYCLE_ALL:
+      setAllChannelsDirect(testCycleOn);
+      break;
+    case TEST_CYCLE_CHANNEL:
+      setChannelDirect(testTargetChannel, testCycleOn);
+      break;
+    case TEST_CYCLE_BOARD:
+      setBoardChannelsDirect(testTargetBoard, testCycleOn);
+      break;
+    default:
+      break;
+  }
+}

@@ -82,6 +82,7 @@ void setup() {
 void loop() {
   server.handleClient();
   updateRelayTimers();
+  updateTestMode();
 
   if (!isInAPMode) {
     ArduinoOTA.handle();

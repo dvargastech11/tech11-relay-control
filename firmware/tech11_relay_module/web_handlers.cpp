@@ -62,6 +62,37 @@ static void handleRoot() {
   }
   html += "<div id='status' style='color:#aaa;margin-top:10px;'></div>";
 
+  html += "<h3>Advanced Test Modes</h3>";
+  html += "<div class='field'><label>Hold / Cycle Duration (ms)</label>"
+          "<input type='number' id='testDuration' value='1000' min='100' step='100' "
+          "style='width:100px;padding:6px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#eee;'></div>";
+
+  html += "<div style='margin-bottom:10px;'>";
+  html += "<button onclick=\"testAllOn()\">All ON (hold)</button>";
+  html += "<button onclick=\"testAllOff()\">All OFF (hold)</button>";
+  html += "<button onclick=\"testCycleAll()\">Cycle All</button>";
+  html += "<button onclick=\"testStop()\" style='background:#7a1f1f;'>Stop Test</button>";
+  html += "</div>";
+
+  html += "<div style='margin-bottom:10px;'>";
+  html += "<label style='font-size:13px;color:#aaa;'>Relay # </label>";
+  html += "<input type='number' id='cycleChannel' min='1' max='" + String(HARDWARE_CHANNELS) + "' value='1' "
+          "style='width:60px;padding:6px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#eee;'>";
+  html += "<button onclick=\"testCycleChannel()\">Cycle This Relay</button>";
+  html += "</div>";
+
+  html += "<div style='margin-bottom:10px;'>";
+  html += "<label style='font-size:13px;color:#aaa;'>Board </label>";
+  html += "<select id='cycleBoard' style='padding:6px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#eee;'>";
+  for (int b = 1; b <= NUM_MCP_BOARDS; b++) {
+    html += "<option value='" + String(b) + "'>Board " + String(b) + "</option>";
+  }
+  html += "</select>";
+  html += "<button onclick=\"testCycleBoard()\">Cycle This Board</button>";
+  html += "</div>";
+
+  html += "<div id='testStatus' style='color:#aaa;margin-bottom:16px;'></div>";
+
   html += "<h3>Links</h3>";
   html += "<p><a href='/network/save-page'>Network Settings</a></p>";
   html += "<p><a href='/logs'>Activity Log</a></p>";
@@ -80,6 +111,21 @@ static void handleRoot() {
   html += "async function trigDiag(n){document.getElementById('status').innerText='Sending channel '+n+'...';"
           "try{const r=await fetch('/diag/trigger?channel='+n+'&duration=5000',{method:'POST'});"
           "document.getElementById('status').innerText=await r.text();}catch(e){document.getElementById('status').innerText='Error: '+e;}}";
+  html += "function testDur(){return document.getElementById('testDuration').value;}";
+  html += "async function testAllOn(){const r=await fetch('/diag/test/all-on',{method:'POST'});"
+          "document.getElementById('testStatus').innerText=await r.text();}";
+  html += "async function testAllOff(){const r=await fetch('/diag/test/all-off',{method:'POST'});"
+          "document.getElementById('testStatus').innerText=await r.text();}";
+  html += "async function testCycleAll(){const r=await fetch('/diag/test/cycle-all?duration='+testDur(),{method:'POST'});"
+          "document.getElementById('testStatus').innerText=await r.text();}";
+  html += "async function testCycleChannel(){const ch=document.getElementById('cycleChannel').value;"
+          "const r=await fetch('/diag/test/cycle-channel?channel='+ch+'&duration='+testDur(),{method:'POST'});"
+          "document.getElementById('testStatus').innerText=await r.text();}";
+  html += "async function testCycleBoard(){const b=document.getElementById('cycleBoard').value;"
+          "const r=await fetch('/diag/test/cycle-board?board='+b+'&duration='+testDur(),{method:'POST'});"
+          "document.getElementById('testStatus').innerText=await r.text();}";
+  html += "async function testStop(){const r=await fetch('/diag/test/stop',{method:'POST'});"
+          "document.getElementById('testStatus').innerText=await r.text();}";
   html += "async function checkUpdate(){document.getElementById('updateStatus').innerText='Checking...';"
           "const r=await fetch('/update/check');document.getElementById('updateStatus').innerText=await r.text();}";
   html += "async function applyUpdate(){if(!confirm('Reboots if update applied. Continue?'))return;"
@@ -433,6 +479,81 @@ static void handleDiagTrigger() {
   server.send(200, "text/plain", "OK: channel " + String(channel) + " activated for " + String(duration) + "ms");
 }
 
+// ---- Advanced test modes (continuous hold/cycle, not single-shot) ----
+
+static void handleTestAllOn() {
+  if (!checkAuth()) return;
+  startTestAllOn();
+  server.send(200, "text/plain", "All relays ON (holding indefinitely)");
+}
+
+static void handleTestAllOff() {
+  if (!checkAuth()) return;
+  startTestAllOff();
+  server.send(200, "text/plain", "All relays OFF (holding indefinitely)");
+}
+
+static void handleTestCycleAll() {
+  if (!checkAuth()) return;
+  if (!server.hasArg("duration")) {
+    server.send(400, "text/plain", "Missing duration parameter");
+    return;
+  }
+  int holdMs = server.arg("duration").toInt();
+  if (holdMs <= 0) {
+    server.send(400, "text/plain", "Invalid duration");
+    return;
+  }
+  startTestCycleAll(holdMs);
+  server.send(200, "text/plain", "Cycling ALL relays every " + String(holdMs) + "ms");
+}
+
+static void handleTestCycleChannel() {
+  if (!checkAuth()) return;
+  if (!server.hasArg("channel") || !server.hasArg("duration")) {
+    server.send(400, "text/plain", "Missing channel or duration parameter");
+    return;
+  }
+  int channel = server.arg("channel").toInt();
+  int holdMs = server.arg("duration").toInt();
+  if (channel < 1 || channel > HARDWARE_CHANNELS) {
+    server.send(400, "text/plain", "Channel out of range (1-" + String(HARDWARE_CHANNELS) + ")");
+    return;
+  }
+  if (holdMs <= 0) {
+    server.send(400, "text/plain", "Invalid duration");
+    return;
+  }
+  startTestCycleChannel(channel, holdMs);
+  server.send(200, "text/plain", "Cycling channel #" + String(channel) + " every " + String(holdMs) + "ms");
+}
+
+static void handleTestCycleBoard() {
+  if (!checkAuth()) return;
+  if (!server.hasArg("board") || !server.hasArg("duration")) {
+    server.send(400, "text/plain", "Missing board or duration parameter");
+    return;
+  }
+  int board = server.arg("board").toInt(); // 1-3 from the UI
+  int holdMs = server.arg("duration").toInt();
+  if (board < 1 || board > NUM_MCP_BOARDS) {
+    server.send(400, "text/plain", "Board out of range (1-" + String(NUM_MCP_BOARDS) + ")");
+    return;
+  }
+  if (holdMs <= 0) {
+    server.send(400, "text/plain", "Invalid duration");
+    return;
+  }
+  startTestCycleBoard(board - 1, holdMs); // convert to 0-indexed
+  server.send(200, "text/plain", "Cycling board " + String(board) + " every " + String(holdMs) + "ms");
+}
+
+static void handleTestStop() {
+  if (!checkAuth()) return;
+  stopTestMode();
+  server.send(200, "text/plain", "Test mode stopped, all relays OFF");
+}
+
 static void handleStatus() {
   if (!checkApiKey()) return;
 
@@ -511,6 +632,12 @@ void registerWebHandlers() {
 
   server.on("/trigger", HTTP_POST, handleTrigger);
   server.on("/diag/trigger", HTTP_POST, handleDiagTrigger);
+  server.on("/diag/test/all-on", HTTP_POST, handleTestAllOn);
+  server.on("/diag/test/all-off", HTTP_POST, handleTestAllOff);
+  server.on("/diag/test/cycle-all", HTTP_POST, handleTestCycleAll);
+  server.on("/diag/test/cycle-channel", HTTP_POST, handleTestCycleChannel);
+  server.on("/diag/test/cycle-board", HTTP_POST, handleTestCycleBoard);
+  server.on("/diag/test/stop", HTTP_POST, handleTestStop);
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/reboot", HTTP_POST, handleRebootCommand);
   server.on("/network/api-save", HTTP_POST, handleApiNetworkSave);
