@@ -5,7 +5,7 @@
   other files in this same sketch folder:
 
     config.h            - all the CHANGE-THIS constants (incl. ETH pins)
-    network_config.*     - Ethernet primary connection, WiFi AP setup fallback
+    network_config.*     - WiFi primary connection, AP setup fallback
     auth.*                - admin login, forced password change, API key
     relay_control.*      - MCP23017-driven relays, board scan/online detect
     activity_log.*       - NTP timestamp + ring buffer log
@@ -13,16 +13,19 @@
     ota_update.*          - GitHub OTA + rollback
     web_handlers.*        - every HTTP route handler
 
-  NETWORK ARCHITECTURE: Ethernet (LAN8720) is the primary connection. WiFi
-  is used ONLY as a fallback setup network when Ethernet isn't connected -
-  there is no WiFi STA client mode in production.
+  NETWORK ARCHITECTURE: WiFi STA is the primary connection (TEMPORARY -
+  reverted from Ethernet while an Ethernet PHY power issue - undervoltage
+  causing "power up timeout" - is set aside for later work). All the
+  Ethernet code (network_config.cpp's connectToEthernet()/etc, config.h's
+  ETH_PHY_* pins) is fully intact and unused - re-enabling it later is
+  just a matter of swapping which function setupNetworkWithFallback()
+  calls.
 
   Library dependencies (Arduino Library Manager):
     ArduinoJson (Benoit Blanchon)
 */
 
 #include <WiFi.h>
-#include <ETH.h>
 #include <WebServer.h>
 #include <ArduinoOTA.h>
 #include <Preferences.h>
@@ -45,18 +48,10 @@ void setup() {
   Serial.begin(115200);
   delay(500);
 
-  // IMPORTANT: network (Ethernet) initializes FIRST, before anything else
-  // that claims an interrupt (I2C via setupRelayPins(), etc). The ESP32's
-  // EMAC interrupt request is one of the pickier ones to satisfy - if the
-  // interrupt matrix has already been partially claimed by other
-  // peripherals, ETH.begin() can fail with "No free interrupt inputs for
-  // ETH_MAC interrupt". Doing this first, right after boot, gives it the
-  // best chance at a clean interrupt matrix.
+  setupRelayPins();
   loadNetworkConfig();
   loadAuthConfig();
-  setupNetworkWithFallback(); // tries Ethernet first, falls back to WiFi setup AP
-
-  setupRelayPins(); // I2C (Wire.begin()) happens here, after Ethernet is claimed
+  setupNetworkWithFallback(); // tries WiFi STA first, falls back to setup AP
 
   ensureDeviceNameSet();  // MAC is only valid now that the network stack has initialized
   deviceApiKey = computeDeviceApiKey();
@@ -81,7 +76,7 @@ void setup() {
   esp_ota_mark_app_valid_cancel_rollback();
 
   Serial.println("[SYS] " + deviceName + " ready. IP: " +
-                  (isInAPMode ? WiFi.softAPIP().toString() : ETH.localIP().toString()));
+                  (isInAPMode ? WiFi.softAPIP().toString() : WiFi.localIP().toString()));
 }
 
 void loop() {
@@ -101,23 +96,23 @@ void loop() {
       checkForUpdates(false);
     }
   } else {
-    // In AP fallback mode: periodically retry Ethernet in the background
-    // (the setup AP stays up the whole time so a human can still reach the
-    // device). If Ethernet connects, restart to cleanly re-enter normal
-    // operation - simpler and safer than trying to hot-swap
-    // discovery/OTA/NTP state at runtime.
+    // In AP fallback mode: periodically retry the originally configured
+    // WiFi in the background (AP stays up the whole time for setup access).
+    // If it connects, restart to cleanly re-enter normal operation -
+    // simpler and safer than trying to hot-swap discovery/OTA/NTP state
+    // at runtime.
     static unsigned long lastReconnectAttempt = 0;
-    const unsigned long RECONNECT_RETRY_INTERVAL_MS = 15UL * 1000; // every 15s
+    const unsigned long RECONNECT_RETRY_INTERVAL_MS = 60UL * 1000; // every 60s
     unsigned long now = millis();
 
     if (now - lastReconnectAttempt > RECONNECT_RETRY_INTERVAL_MS) {
       lastReconnectAttempt = now;
-      Serial.println("[NET] AP mode: checking for Ethernet link...");
-      startBackgroundEthernetRetry();
+      Serial.println("[WIFI] AP mode: attempting background reconnect to configured network...");
+      startBackgroundReconnectAttempt();
     }
 
-    if (isEthernetConnected()) {
-      Serial.println("[NET] Ethernet connected - restarting to fully exit AP mode...");
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("[WIFI] Reconnected to configured network - restarting to fully exit AP mode...");
       delay(500);
       ESP.restart();
     }

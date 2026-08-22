@@ -12,20 +12,30 @@ extern IPAddress subnetMask;
 extern IPAddress dns1;
 extern IPAddress dns2;
 extern String ntpServer;
-extern bool isInAPMode; // true = Ethernet not connected, hosting setup AP over WiFi
+extern String wifiSSID;
+extern String wifiPassword;
+extern bool isInAPMode; // true = not connected (WiFi or Ethernet), hosting setup AP
 
 String generateDeviceName();
 void ensureDeviceNameSet();
 void loadNetworkConfig();
 void saveNetworkConfig(String name, bool dhcp, String ip, String gw, String sn,
                         String dns1Str, String dns2Str, String ntpStr);
+void saveWifiCredentials(String ssid, String password);
 
-// Ethernet is the primary connection - WiFi is only used for the setup AP,
-// there is no WiFi STA client mode in production anymore.
-bool connectToEthernet();
-bool isEthernetConnected();
+// WiFi STA is the PRIMARY connection again (temporarily reverted from
+// Ethernet while an Ethernet PHY power issue is being worked out - see
+// connectToEthernet()/etc below, kept intact and ready to re-enable later).
+bool connectToWiFi();
 void startFallbackAP();
 void setupNetworkWithFallback();
+void startBackgroundReconnectAttempt();
+
+// Ethernet functions - currently UNUSED (not called from setup()/loop()),
+// kept fully intact so re-enabling Ethernet later is just a matter of
+// swapping which of these two blocks setupNetworkWithFallback() calls.
+bool connectToEthernet();
+bool isEthernetConnected();
 void startBackgroundEthernetRetry();
 
 #endif
