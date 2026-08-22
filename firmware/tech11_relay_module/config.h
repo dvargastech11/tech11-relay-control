@@ -54,8 +54,8 @@
 // (16 channels each, 48 available, 47 used - matches one elevator's floor
 // count). Replaces the earlier 2-relay direct-GPIO test config.
 #define NUM_RELAYS 47
-#define RELAY_ACTIVE_LEVEL HIGH
-#define RELAY_INACTIVE_LEVEL LOW
+#define RELAY_ACTIVE_LEVEL LOW    // ACEIRMC 16-channel relay board is low-level trigger
+#define RELAY_INACTIVE_LEVEL HIGH
 
 // I2C addresses for the 3 MCP23017 boards, confirmed via i2c_scanner.ino
 // testing. Full 8-combination table (each switch subtracts a fixed value
