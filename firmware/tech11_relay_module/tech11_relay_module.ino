@@ -45,10 +45,18 @@ void setup() {
   Serial.begin(115200);
   delay(500);
 
-  setupRelayPins();
+  // IMPORTANT: network (Ethernet) initializes FIRST, before anything else
+  // that claims an interrupt (I2C via setupRelayPins(), etc). The ESP32's
+  // EMAC interrupt request is one of the pickier ones to satisfy - if the
+  // interrupt matrix has already been partially claimed by other
+  // peripherals, ETH.begin() can fail with "No free interrupt inputs for
+  // ETH_MAC interrupt". Doing this first, right after boot, gives it the
+  // best chance at a clean interrupt matrix.
   loadNetworkConfig();
   loadAuthConfig();
   setupNetworkWithFallback(); // tries Ethernet first, falls back to WiFi setup AP
+
+  setupRelayPins(); // I2C (Wire.begin()) happens here, after Ethernet is claimed
 
   ensureDeviceNameSet();  // MAC is only valid now that the network stack has initialized
   deviceApiKey = computeDeviceApiKey();
