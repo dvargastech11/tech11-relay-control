@@ -56,10 +56,16 @@
 #define RELAY_ACTIVE_LEVEL HIGH
 #define RELAY_INACTIVE_LEVEL LOW
 
-// I2C addresses for the 3 MCP23017 boards - set via each board's onboard
-// address DIP switch/jumpers to match these exactly.
-#define MCP23017_ADDR_1 0x20  // relays 1-16
-#define MCP23017_ADDR_2 0x21  // relays 17-32
-#define MCP23017_ADDR_3 0x22  // relays 33-47 (only 15 of 16 channels used)
+// I2C addresses for the 3 MCP23017 boards. Board 1 is set to this specific
+// SG-IO-E017 board's FACTORY DEFAULT (0x27, per its manual - "DIP switch
+// connected to high level by default, displayed address is 0x27"), so no
+// DIP switch changes are needed for the first board. Boards 2 and 3 will
+// need their DIP switches changed to two other distinct addresses once
+// they arrive - use firmware/i2c_scanner/i2c_scanner.ino to confirm the
+// actual resulting address after any switch change, since the manual
+// doesn't give an exact switch-to-bit truth table.
+#define MCP23017_ADDR_1 0x27  // relays 1-16 (factory default, no DIP changes needed)
+#define MCP23017_ADDR_2 0x21  // relays 17-32 (placeholder - confirm via scanner once board 2 arrives)
+#define MCP23017_ADDR_3 0x22  // relays 33-47, only 15 of 16 channels used (placeholder - confirm via scanner once board 3 arrives)
 
 #endif
