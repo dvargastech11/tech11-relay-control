@@ -3,6 +3,7 @@
 #include "auth.h"
 #include "network_config.h"
 #include "relay_control.h"
+#include "external_input.h"
 #include "activity_log.h"
 #include "ota_update.h"
 
@@ -608,6 +609,24 @@ static void handleStatusBoards() {
   server.send(200, "application/json", output);
 }
 
+// Reports the external digital input's current state - a spare GPIO
+// watching an EXTERNAL relay's dry contact, unrelated to the 48 floor-call
+// relays. The server polls this to detect a "stuck closed" condition and
+// fire an Nx Witness alert.
+static void handleStatusExternal() {
+  if (!checkApiKey()) return;
+
+  StaticJsonDocument<256> doc;
+  bool closed = isExternalInputClosed();
+  doc["closed"] = closed;
+  doc["stateDurationMs"] = externalInputStateDurationMs();
+  doc["stuckClosed"] = isExternalInputStuckClosed();
+
+  String output;
+  serializeJson(doc, output);
+  server.send(200, "application/json", output);
+}
+
 static void handleRebootCommand() {
   if (!checkApiKey()) return;
   server.send(200, "application/json", "{\"status\":\"rebooting\"}");
@@ -675,6 +694,7 @@ void registerWebHandlers() {
   server.on("/diag/test/stop", HTTP_POST, handleTestStop);
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/status/boards", HTTP_GET, handleStatusBoards);
+  server.on("/status/external", HTTP_GET, handleStatusExternal);
   server.on("/reboot", HTTP_POST, handleRebootCommand);
   server.on("/network/api-save", HTTP_POST, handleApiNetworkSave);
 }

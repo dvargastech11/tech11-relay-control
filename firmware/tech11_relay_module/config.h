@@ -63,4 +63,12 @@
 // 1/2/3. No manual address configuration needed here anymore - just set
 // each board's DIP switches to any 3 distinct addresses within 0x20-0x27.
 
+// External digital input monitoring - a spare GPIO watching an EXTERNAL
+// relay's dry contact, unrelated to the 48 floor-call relays above. With
+// the internal pull-up enabled: contact open -> HIGH, contact closed ->
+// LOW (shorted to GND). Not one of our own driven outputs - purely a
+// sensing input for something else in the system.
+#define EXTERNAL_INPUT_PIN 4
+#define EXTERNAL_INPUT_STUCK_THRESHOLD_MS (60UL * 60UL * 1000UL) // 1 hour
+
 #endif
