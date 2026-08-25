@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Nx Witness Settings{% endblock %}
+{% block content %}
+  <h1>Nx Witness Settings</h1>
+  <p style="color:#888; max-width:500px; margin:0 auto 20px;">
+    Connection details for firing alerts/events into Nx Witness when an elevator's external input
+    monitoring (enabled per-elevator on its Assign Device page) detects a stuck-closed condition.
+  </p>
+
+  <form method="POST" style="max-width:500px; margin:0 auto; text-align:left;">
+    <label style="display:flex; align-items:center; gap:8px; color:#eee; font-size:15px; margin-bottom:20px; cursor:pointer;">
+      <input type="checkbox" name="enabled" {{ 'checked' if config.enabled }}>
+      Enable Nx Witness integration
+    </label>
+
+    <label style="color:#aaa; font-size:14px;">Server Address</label>
+    <input type="text" name="server_address" value="{{ config.server_address }}" placeholder="192.168.1.50 or nxserver.local"
+      style="width:100%; padding:10px; margin:6px 0 16px; border-radius:6px; border:1px solid #444;
+      background:#262626; color:#eee; box-sizing:border-box;">
+
+    <label style="color:#aaa; font-size:14px;">Port</label>
+    <input type="number" name="port" value="{{ config.port }}" placeholder="7001"
+      style="width:100%; padding:10px; margin:6px 0 16px; border-radius:6px; border:1px solid #444;
+      background:#262626; color:#eee; box-sizing:border-box;">
+
+    <label style="display:flex; align-items:center; gap:8px; color:#eee; font-size:14px; margin-bottom:16px; cursor:pointer;">
+      <input type="checkbox" name="use_api_key" id="useApiKey" {{ 'checked' if config.use_api_key }} onchange="toggleAuthFields()">
+      Use API Key (recommended over username/password)
+    </label>
+
+    <div id="apiKeyField">
+      <label style="color:#aaa; font-size:14px;">API Key</label>
+      <input type="password" name="api_key" value="{{ config.api_key }}" placeholder="Leave blank to keep current key"
+        style="width:100%; padding:10px; margin:6px 0 16px; border-radius:6px; border:1px solid #444;
+        background:#262626; color:#eee; box-sizing:border-box;">
+      <p style="color:#666; font-size:12px; margin:-10px 0 16px;">
+        Generate one in Nx Witness under System Administration &rarr; API Keys - lets you revoke this
+        integration's access independently of any user's login password.
+      </p>
+    </div>
+
+    <div id="userPassFields">
+      <label style="color:#aaa; font-size:14px;">Username</label>
+      <input type="text" name="username" value="{{ config.username }}"
+        style="width:100%; padding:10px; margin:6px 0 16px; border-radius:6px; border:1px solid #444;
+        background:#262626; color:#eee; box-sizing:border-box;">
+
+      <label style="color:#aaa; font-size:14px;">Password</label>
+      <input type="password" name="password" value="{{ config.password }}" placeholder="Leave blank to keep current password"
+        style="width:100%; padding:10px; margin:6px 0 16px; border-radius:6px; border:1px solid #444;
+        background:#262626; color:#eee; box-sizing:border-box;">
+    </div>
+
+    <label style="display:flex; align-items:center; gap:8px; color:#aaa; font-size:14px; margin-bottom:20px; cursor:pointer;">
+      <input type="checkbox" name="verify_ssl" {{ 'checked' if config.verify_ssl }}>
+      Verify SSL certificate (leave unchecked for self-signed certs, common on-prem)
+    </label>
+
+    <button type="submit" style="width:100%; padding:12px; border:none; border-radius:8px;
+      background:#2d6cdf; color:white; font-size:15px; cursor:pointer;">Save Settings</button>
+  </form>
+
+  {% if config.enabled and not is_configured %}
+    <p style="max-width:500px; margin:16px auto; color:#e0a800; font-size:13px;">
+      &#9888; Enabled, but missing required fields - fill in server address and either an API key
+      or username/password for this to actually work.
+    </p>
+  {% endif %}
+
+  <script>
+    function toggleAuthFields() {
+      const useApiKey = document.getElementById('useApiKey').checked;
+      document.getElementById('apiKeyField').style.display = useApiKey ? 'block' : 'none';
+      document.getElementById('userPassFields').style.display = useApiKey ? 'none' : 'block';
+    }
+    toggleAuthFields();
+  </script>
+{% endblock %}

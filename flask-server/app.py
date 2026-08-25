@@ -98,6 +98,7 @@ def logout():
 import building_store as bstore
 import devices as devsvc
 import device_config_store as devcfg
+import nxwitness_config as nxcfg
 
 REQUEST_TIMEOUT_SEC = 3
 HOLD_MS = 5000  # fixed 5 second hold for all floor buttons
@@ -476,6 +477,39 @@ def devices_resync():
     return jsonify({"success": False, "error": "Could not reach device to push the config."})
 
 
+@app.route("/admin/nxwitness-settings", methods=["GET", "POST"])
+@admin_required
+def admin_nxwitness_settings():
+    if request.method == "POST":
+        existing = nxcfg.load_config()
+
+        new_api_key = request.form.get("api_key", "").strip()
+        new_password = request.form.get("password", "").strip()
+
+        config = {
+            "enabled": request.form.get("enabled") == "on",
+            "server_address": request.form.get("server_address", "").strip(),
+            "port": int(request.form.get("port") or 7001),
+            "use_api_key": request.form.get("use_api_key") == "on",
+            # Leaving a secret field blank keeps whatever was saved before,
+            # rather than wiping it out - matches the "leave blank to keep
+            # current" placeholder text on the form.
+            "api_key": new_api_key or existing.get("api_key", ""),
+            "username": request.form.get("username", "").strip(),
+            "password": new_password or existing.get("password", ""),
+            "verify_ssl": request.form.get("verify_ssl") == "on",
+        }
+        nxcfg.save_config(config)
+        flash("Nx Witness settings saved.")
+        return redirect(url_for("admin_nxwitness_settings"))
+
+    config = nxcfg.load_config()
+    return render_template(
+        "admin_nxwitness_settings.html", active_page="nxwitness_settings",
+        config=config, is_configured=nxcfg.is_configured(config),
+    )
+
+
 @app.route("/devices/network", methods=["GET", "POST"])
 @admin_required
 def devices_network():
@@ -650,6 +684,7 @@ def admin_assign_device(building_id, elevator_number):
         mac = request.form.get("mac", "").strip()
         ip = request.form.get("ip", "").strip()
         device_name = request.form.get("device_name", "").strip()
+        external_input_monitoring = request.form.get("external_input_monitoring") == "on"
 
         if not mac or not ip:
             flash("MAC address and IP are both required.")
@@ -675,6 +710,7 @@ def admin_assign_device(building_id, elevator_number):
                     push_message = f"Could not read local firmware.bin: {e}"
 
             bstore.assign_device(data, building_id, elevator_number, mac, ip, device_name)
+            bstore.set_external_input_monitoring(data, building_id, elevator_number, external_input_monitoring)
 
             # Push the name to the actual device too - previously this only
             # saved a local label in buildings.json, which is why renaming
@@ -712,6 +748,7 @@ def admin_assign_device(building_id, elevator_number):
         "device_mac": request.args.get("mac", elevator.get("device_mac") or ""),
         "device_ip": request.args.get("ip", elevator.get("device_ip") or ""),
         "device_name": request.args.get("name", elevator.get("device_name") or ""),
+        "external_input_monitoring_enabled": elevator.get("external_input_monitoring_enabled", False),
     }
 
     return render_template(

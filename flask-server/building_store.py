@@ -148,8 +148,19 @@ def _new_elevator_skeleton(elevator_number):
         "device_mac": None,
         "device_ip": None,
         "device_name": None,
+        "external_input_monitoring_enabled": False,  # opt-in per elevator - Nx Witness alert on stuck external relay
         "floors": [],  # list of floor dicts, order preserved
     }
+
+
+def set_external_input_monitoring(data, building_id, elevator_number, enabled):
+    building = get_building(data, building_id)
+    elevator = get_elevator(building, elevator_number) if building else None
+    if not elevator:
+        return False
+    elevator["external_input_monitoring_enabled"] = bool(enabled)
+    save_data(data)
+    return True
 
 
 def _make_floor(number, label=None):

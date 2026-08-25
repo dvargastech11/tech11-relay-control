@@ -22,6 +22,11 @@
       style="width:100%; padding:10px; margin:6px 0 16px; border-radius:6px; border:1px solid #444;
       background:#262626; color:#eee; box-sizing:border-box;">
 
+    <label style="display:flex; align-items:center; gap:8px; color:#aaa; font-size:14px; margin-bottom:16px; cursor:pointer;">
+      <input type="checkbox" name="external_input_monitoring" {{ 'checked' if elevator.external_input_monitoring_enabled }}>
+      Monitor external relay input (Nx Witness alert if stuck closed &gt; 1 hour)
+    </label>
+
     <button type="submit" style="width:100%; padding:12px; border:none; border-radius:8px;
       background:#2d6cdf; color:white; font-size:15px; cursor:pointer;">Save Device Assignment</button>
   </form>
