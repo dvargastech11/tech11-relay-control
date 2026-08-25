@@ -11,3 +11,10 @@ venv/
 # Arduino build artifacts
 *.bin
 build/
+
+# EXCEPT the published firmware release binaries - these ARE meant to be
+# committed (build_and_release_firmware.ps1 publishes here, and the ESP32's
+# own OTA check + the website's "auto-update outdated devices" feature both
+# depend on these actually being in the repo).
+!firmware/firmware.bin
+!firmware/releases/*.bin
