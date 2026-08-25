@@ -577,6 +577,37 @@ static void handleStatus() {
   server.send(200, "application/json", output);
 }
 
+// Reports which MCP23017 boards are actually online right now, and how
+// many are used in production (NUM_RELAYS) vs the total hardware capacity
+// (HARDWARE_CHANNELS) - lets the Flask Test Buttons page size its grid to
+// match real detected hardware instead of a hardcoded assumption.
+static void handleStatusBoards() {
+  if (!checkApiKey()) return;
+
+  scanMCPBoards(); // re-check live status rather than relying on boot-time state
+
+  StaticJsonDocument<512> doc;
+  doc["numRelaysUsed"] = NUM_RELAYS;
+  doc["hardwareChannels"] = HARDWARE_CHANNELS;
+  doc["numBoards"] = NUM_MCP_BOARDS;
+
+  JsonArray boards = doc.createNestedArray("boards");
+  for (int b = 0; b < NUM_MCP_BOARDS; b++) {
+    JsonObject boardObj = boards.createNestedObject();
+    boardObj["board"] = b + 1;
+    boardObj["online"] = isBoardOnline(b);
+    char addrBuf[6];
+    sprintf(addrBuf, "0x%02X", getBoardAddress(b));
+    boardObj["address"] = addrBuf;
+    boardObj["channelStart"] = b * 16 + 1;
+    boardObj["channelEnd"] = b * 16 + 16;
+  }
+
+  String output;
+  serializeJson(doc, output);
+  server.send(200, "application/json", output);
+}
+
 static void handleRebootCommand() {
   if (!checkApiKey()) return;
   server.send(200, "application/json", "{\"status\":\"rebooting\"}");
@@ -643,6 +674,7 @@ void registerWebHandlers() {
   server.on("/diag/test/cycle-board", HTTP_POST, handleTestCycleBoard);
   server.on("/diag/test/stop", HTTP_POST, handleTestStop);
   server.on("/status", HTTP_GET, handleStatus);
+  server.on("/status/boards", HTTP_GET, handleStatusBoards);
   server.on("/reboot", HTTP_POST, handleRebootCommand);
   server.on("/network/api-save", HTTP_POST, handleApiNetworkSave);
 }

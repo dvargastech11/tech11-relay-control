@@ -116,6 +116,25 @@ def poll_status(ip, mac):
     return False, None
 
 
+def poll_board_status(ip, mac):
+    """Returns (is_online: bool, board_status_dict_or_None) from /status/boards -
+    real detected MCP23017 board count/online state, not an assumed value."""
+    if not ip or not mac:
+        return False, None
+    api_key = compute_device_api_key(mac)
+    try:
+        resp = requests.get(
+            f"http://{ip}/status/boards",
+            headers={"X-API-Key": api_key},
+            timeout=REQUEST_TIMEOUT_SEC,
+        )
+        if resp.status_code == 200:
+            return True, resp.json()
+    except requests.RequestException:
+        pass
+    return False, None
+
+
 def reboot_device(ip, mac):
     if not ip or not mac:
         return False

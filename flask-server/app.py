@@ -204,7 +204,7 @@ def activate(building_id, elevator_number, floor_number, duration_ms):
 
 # ---- ADMIN: TEST BUTTONS (raw relay test, bypasses floor/schedule config) ----
 
-HARDWARE_CHANNELS_PER_DEVICE = 16  # matches the 16-channel relay board design
+HARDWARE_CHANNELS_PER_DEVICE = 48  # fallback default only - real count comes from /status/boards when reachable
 
 @app.route("/admin/test-buttons")
 @admin_required
@@ -215,38 +215,61 @@ def admin_test_buttons():
         for elevator in building["elevators"]:
             if elevator.get("device_ip"):
                 floors = elevator.get("floors") or []
+                mac = elevator.get("device_mac")
+                ip = elevator["device_ip"]
 
-                # Build a 1..16 relay grid: relay N is "configured" if the
-                # elevator has a floor at that position, showing its label;
-                # anything beyond the configured floor count stays greyed out.
+                board_online, board_status = devsvc.poll_board_status(ip, mac)
+
+                if board_online and board_status:
+                    hardware_channels = board_status.get("hardwareChannels", HARDWARE_CHANNELS_PER_DEVICE)
+                    boards_info = board_status.get("boards", [])
+                else:
+                    # Device unreachable, or running older firmware without
+                    # this endpoint - fall back to the default rather than
+                    # showing nothing at all.
+                    hardware_channels = HARDWARE_CHANNELS_PER_DEVICE
+                    boards_info = []
+
+                # Map each channel number to whether ITS board is actually
+                # online right now, so we can grey out a whole board's worth
+                # of buttons if that board isn't detected - not just channels
+                # beyond the configured floor count.
+                board_online_by_channel = {}
+                for b in boards_info:
+                    online = b.get("online", False)
+                    for ch in range(b.get("channelStart", 1), b.get("channelEnd", 16) + 1):
+                        board_online_by_channel[ch] = online
+
                 relay_grid = []
-                for relay_num in range(1, HARDWARE_CHANNELS_PER_DEVICE + 1):
-                    if relay_num <= len(floors):
-                        relay_grid.append({
-                            "relay_num": relay_num,
-                            "configured": True,
-                            "label": floors[relay_num - 1]["label"],
-                        })
-                    else:
-                        relay_grid.append({
-                            "relay_num": relay_num,
-                            "configured": False,
-                            "label": None,
-                        })
+                for relay_num in range(1, hardware_channels + 1):
+                    is_floor_configured = relay_num <= len(floors)
+                    # If we don't have board info (older firmware/unreachable),
+                    # don't block on it - assume available rather than greying
+                    # out everything.
+                    is_board_online = board_online_by_channel.get(relay_num, True)
+                    relay_grid.append({
+                        "relay_num": relay_num,
+                        "configured": is_floor_configured,
+                        "board_online": is_board_online,
+                        "label": floors[relay_num - 1]["label"] if is_floor_configured else None,
+                    })
 
                 devices_list.append({
                     "building_id": building["id"],
                     "building_name": building["name"],
                     "elevator_number": elevator["elevator_number"],
-                    "device_name": elevator.get("device_name") or elevator["device_ip"],
-                    "device_ip": elevator["device_ip"],
-                    "device_mac": elevator.get("device_mac"),
+                    "device_name": elevator.get("device_name") or ip,
+                    "device_ip": ip,
+                    "device_mac": mac,
                     "relay_grid": relay_grid,
                     "num_configured": len(floors),
+                    "hardware_channels": hardware_channels,
+                    "boards_detected": len([b for b in boards_info if b.get("online")]),
+                    "boards_total": len(boards_info),
                 })
     return render_template(
         "admin_test_buttons.html", active_page="test_buttons",
-        devices=devices_list, hardware_channels=HARDWARE_CHANNELS_PER_DEVICE,
+        devices=devices_list,
     )
 
 
