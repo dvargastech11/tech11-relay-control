@@ -269,6 +269,26 @@ def admin_test_buttons_fire():
 
 # ---- DEVICES: discovery, online/offline status, reboot, remote IP change ----
 
+def format_uptime(seconds):
+    """Formats a raw uptime in seconds as a human-readable string showing
+    the two largest relevant units, e.g. '3h 25m', '2d 4h', '45s'."""
+    if seconds is None:
+        return None
+    seconds = int(seconds)
+
+    days, remainder = divmod(seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, secs = divmod(remainder, 60)
+
+    if days > 0:
+        return f"{days}d {hours}h"
+    if hours > 0:
+        return f"{hours}h {minutes}m"
+    if minutes > 0:
+        return f"{minutes}m {secs}s"
+    return f"{secs}s"
+
+
 def get_latest_firmware_version():
     """Reads firmware/version.txt from this Pi's own repo clone (kept in
     sync via the 'Pull Latest Code & Restart' button), so no separate
@@ -300,6 +320,7 @@ def devices_page():
                     online and device_version and latest_firmware_version
                     and device_version != latest_firmware_version
                 )
+                uptime_formatted = format_uptime(status.get("uptimeSec")) if (online and status) else None
 
                 assigned.append({
                     "building_name": building["name"],
@@ -311,6 +332,7 @@ def devices_page():
                     "online": online,
                     "status": status,
                     "firmware_version": device_version,
+                    "uptime_formatted": uptime_formatted,
                     "update_available": update_available,
                 })
 

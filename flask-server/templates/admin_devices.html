@@ -41,7 +41,7 @@
         <td style="padding:8px;">{{ d.name }}</td>
         <td style="padding:8px;">{{ d.building_name }} - Elevator {{ d.elevator_number }}</td>
         <td style="padding:8px;"><a href="http://{{ d.ip }}" target="_blank" style="color:#2d6cdf;">{{ d.ip }}</a></td>
-        <td style="padding:8px;">{{ (d.status.uptimeSec ~ 's') if d.online and d.status else '-' }}</td>
+        <td style="padding:8px;">{{ d.uptime_formatted or '-' }}</td>
         <td style="padding:8px;">
           {% if d.firmware_version %}
             {{ d.firmware_version }}
