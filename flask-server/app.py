@@ -542,7 +542,24 @@ def admin_assign_device(building_id, elevator_number):
             flash("MAC address and IP are both required.")
         else:
             bstore.assign_device(data, building_id, elevator_number, mac, ip, device_name)
-            flash(f"Device assigned to elevator {elevator_number}.")
+
+            # Push the name to the actual device too - previously this only
+            # saved a local label in buildings.json, which is why renaming
+            # here never showed up on the ESP32 itself. Sending just
+            # {"deviceName": ...} is safe - the firmware preserves every
+            # other network setting it already has (see handleApiNetworkSave()).
+            pushed_ok = False
+            if device_name:
+                pushed_ok = devsvc.update_network(ip, mac, {"deviceName": device_name})
+
+            if device_name and not pushed_ok:
+                flash(f"Device assigned to elevator {elevator_number}, but couldn't reach it to update "
+                      f"its name on-device (it will show the local label here, but not on the device itself "
+                      f"until it's back online and reachable, or you rename it again from Devices > Change IP).")
+            elif device_name and pushed_ok:
+                flash(f"Device assigned to elevator {elevator_number}. Name pushed to the device - it will reboot briefly to apply it.")
+            else:
+                flash(f"Device assigned to elevator {elevator_number}.")
             return redirect(url_for("admin_building_detail", building_id=building_id))
 
     # Support prefill from the Devices page's "Assign" link (?mac=..&ip=..&name=..)
