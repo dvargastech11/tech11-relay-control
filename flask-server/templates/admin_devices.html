@@ -13,7 +13,9 @@
 
   <div style="max-width:900px; margin:0 auto 20px; background:#262626; border-radius:10px; padding:16px;">
     <h3 style="color:#aaa; margin-top:0;">Device Firmware</h3>
-    <p style="color:#888; font-size:13px;">Push a compiled firmware .bin directly to an ESP32 controller.</p>
+    <p style="color:#888; font-size:13px;">
+      Latest available version: <strong style="color:#eee;">{{ latest_firmware_version or 'unknown - firmware/version.txt not found' }}</strong>
+    </p>
     <a href="/devices/push-firmware" style="display:inline-block; padding:10px 16px; border-radius:8px;
       background:#2d6cdf; color:white; text-decoration:none;">Push Firmware Update</a>
   </div>
@@ -27,6 +29,7 @@
         <th style="padding:8px;">Building / Elevator</th>
         <th style="padding:8px;">IP</th>
         <th style="padding:8px;">Uptime</th>
+        <th style="padding:8px;">Firmware</th>
         <th style="padding:8px;">Actions</th>
       </tr>
       {% for d in assigned %}
@@ -39,6 +42,18 @@
         <td style="padding:8px;">{{ d.building_name }} - Elevator {{ d.elevator_number }}</td>
         <td style="padding:8px;"><a href="http://{{ d.ip }}" target="_blank" style="color:#2d6cdf;">{{ d.ip }}</a></td>
         <td style="padding:8px;">{{ (d.status.uptimeSec ~ 's') if d.online and d.status else '-' }}</td>
+        <td style="padding:8px;">
+          {% if d.firmware_version %}
+            {{ d.firmware_version }}
+            {% if d.update_available %}
+              <span style="color:#e0a800; font-size:11px; margin-left:4px;">&#9650; update available</span>
+            {% else %}
+              <span style="color:#2fbf4f; font-size:11px; margin-left:4px;">up to date</span>
+            {% endif %}
+          {% else %}
+            <span style="color:#666;">-</span>
+          {% endif %}
+        </td>
         <td style="padding:8px; white-space:nowrap;">
           <button onclick="reboot('{{ d.ip }}','{{ d.mac }}')" style="padding:6px 10px; border:none;
             border-radius:6px; background:#7a1f1f; color:white; cursor:pointer; font-size:12px;">Reboot</button>
@@ -47,7 +62,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="6" style="padding:12px; color:#888;">No devices assigned yet.</td></tr>
+      <tr><td colspan="7" style="padding:12px; color:#888;">No devices assigned yet.</td></tr>
       {% endfor %}
     </table>
 

@@ -269,10 +269,23 @@ def admin_test_buttons_fire():
 
 # ---- DEVICES: discovery, online/offline status, reboot, remote IP change ----
 
+def get_latest_firmware_version():
+    """Reads firmware/version.txt from this Pi's own repo clone (kept in
+    sync via the 'Pull Latest Code & Restart' button), so no separate
+    network call to GitHub is needed."""
+    version_file = os.path.join(REPO_DIR, "firmware", "version.txt")
+    try:
+        with open(version_file, "r") as f:
+            return f.read().strip()
+    except (FileNotFoundError, OSError):
+        return None
+
+
 @app.route("/devices")
 @admin_required
 def devices_page():
     data = bstore.load_data()
+    latest_firmware_version = get_latest_firmware_version()
 
     assigned = []
     assigned_macs = set()
@@ -281,6 +294,13 @@ def devices_page():
             if elevator.get("device_mac"):
                 assigned_macs.add(elevator["device_mac"].upper())
                 online, status = devsvc.poll_status(elevator["device_ip"], elevator["device_mac"])
+
+                device_version = status.get("firmwareVersion") if (online and status) else None
+                update_available = bool(
+                    online and device_version and latest_firmware_version
+                    and device_version != latest_firmware_version
+                )
+
                 assigned.append({
                     "building_name": building["name"],
                     "building_id": building["id"],
@@ -290,6 +310,8 @@ def devices_page():
                     "mac": elevator["device_mac"],
                     "online": online,
                     "status": status,
+                    "firmware_version": device_version,
+                    "update_available": update_available,
                 })
 
     discovered = devsvc.discover_devices()
@@ -309,6 +331,7 @@ def devices_page():
     return render_template(
         "admin_devices.html", active_page="devices",
         assigned=assigned, unassigned=unassigned, needs_device=needs_device,
+        latest_firmware_version=latest_firmware_version,
     )
 
 
