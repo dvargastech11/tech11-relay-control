@@ -70,11 +70,15 @@
       Unassigned Devices Found on Network
       <a href="/devices" style="font-size:13px; color:#2d6cdf; font-weight:normal; margin-left:10px;">Rescan</a>
     </h3>
+    <p style="color:#888; font-size:12px; max-width:900px; margin:0 auto 10px;">
+      Devices running outdated firmware will be automatically updated (and will reboot) the moment you assign them.
+    </p>
     <table style="width:100%; max-width:900px; margin:0 auto; border-collapse:collapse;">
       <tr style="color:#aaa; text-align:left; font-size:13px;">
         <th style="padding:8px;">Name</th>
         <th style="padding:8px;">IP</th>
         <th style="padding:8px;">MAC</th>
+        <th style="padding:8px;">Firmware</th>
         <th style="padding:8px;">Assign to</th>
       </tr>
       {% for d in unassigned %}
@@ -82,6 +86,18 @@
         <td style="padding:8px;">{{ d.name }}</td>
         <td style="padding:8px;">{{ d.ip }}</td>
         <td style="padding:8px;">{{ d.mac }}</td>
+        <td style="padding:8px;">
+          {% if d.firmware_version %}
+            {{ d.firmware_version }}
+            {% if d.needs_update %}
+              <span style="color:#e0a800; font-size:11px; margin-left:4px;">&#9650; will auto-update on assign</span>
+            {% else %}
+              <span style="color:#2fbf4f; font-size:11px; margin-left:4px;">up to date</span>
+            {% endif %}
+          {% else %}
+            <span style="color:#666;">unknown</span>
+          {% endif %}
+        </td>
         <td style="padding:8px;">
           <form style="display:flex; gap:6px;" onsubmit="return goAssign(this, '{{ d.mac }}', '{{ d.ip }}', '{{ d.name }}')">
             <select style="padding:6px; border-radius:6px; border:1px solid #444; background:#262626; color:#eee;">
@@ -95,7 +111,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="4" style="padding:12px; color:#888;">No unassigned devices found. Try Rescan if a device was just powered on.</td></tr>
+      <tr><td colspan="5" style="padding:12px; color:#888;">No unassigned devices found. Try Rescan if a device was just powered on.</td></tr>
       {% endfor %}
     </table>
   </div>

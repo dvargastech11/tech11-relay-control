@@ -337,7 +337,21 @@ def devices_page():
                 })
 
     discovered = devsvc.discover_devices()
-    unassigned = [d for d in discovered if d.get("mac", "").upper() not in assigned_macs]
+    unassigned = []
+    for d in discovered:
+        if d.get("mac", "").upper() in assigned_macs:
+            continue
+        online, status = devsvc.poll_status(d.get("ip"), d.get("mac"))
+        device_version = status.get("firmwareVersion") if (online and status) else None
+        needs_update = bool(
+            online and device_version and latest_firmware_version
+            and device_version != latest_firmware_version
+        )
+        unassigned.append({
+            **d,
+            "firmware_version": device_version,
+            "needs_update": needs_update,
+        })
 
     # Flat list of elevators needing a device, for the "assign" dropdown on unassigned rows
     needs_device = []
@@ -563,6 +577,26 @@ def admin_assign_device(building_id, elevator_number):
         if not mac or not ip:
             flash("MAC address and IP are both required.")
         else:
+            # Check the device's actual current firmware before assigning -
+            # push the latest firmware.bin first if it's outdated, so a
+            # device never gets assigned into production still running old
+            # code. This causes its own reboot, so we do it before (and
+            # instead of, in the same request) the name push below.
+            firmware_pushed = False
+            online, status = devsvc.poll_status(ip, mac)
+            latest_version = get_latest_firmware_version()
+            device_version = status.get("firmwareVersion") if (online and status) else None
+
+            if online and device_version and latest_version and device_version != latest_version:
+                bin_path = os.path.join(REPO_DIR, "firmware", "firmware.bin")
+                try:
+                    with open(bin_path, "rb") as f:
+                        firmware_bytes = f.read()
+                    firmware_pushed, push_message = devsvc.push_firmware(ip, mac, firmware_bytes)
+                except (FileNotFoundError, OSError) as e:
+                    firmware_pushed = False
+                    push_message = f"Could not read local firmware.bin: {e}"
+
             bstore.assign_device(data, building_id, elevator_number, mac, ip, device_name)
 
             # Push the name to the actual device too - previously this only
@@ -570,11 +604,18 @@ def admin_assign_device(building_id, elevator_number):
             # here never showed up on the ESP32 itself. Sending just
             # {"deviceName": ...} is safe - the firmware preserves every
             # other network setting it already has (see handleApiNetworkSave()).
+            # Skipped if we just pushed a firmware update this same request -
+            # the device is already rebooting from that, sending another
+            # request to it right now would likely just fail or conflict.
             pushed_ok = False
-            if device_name:
+            if device_name and not firmware_pushed:
                 pushed_ok = devsvc.update_network(ip, mac, {"deviceName": device_name})
 
-            if device_name and not pushed_ok:
+            if firmware_pushed:
+                flash(f"Device assigned to elevator {elevator_number}. It was running outdated firmware "
+                      f"({device_version} vs latest {latest_version}) - pushed the update, it's rebooting now. "
+                      f"{'Re-save the name once it is back online.' if device_name else ''}")
+            elif device_name and not pushed_ok:
                 flash(f"Device assigned to elevator {elevator_number}, but couldn't reach it to update "
                       f"its name on-device (it will show the local label here, but not on the device itself "
                       f"until it's back online and reachable, or you rename it again from Devices > Change IP).")
