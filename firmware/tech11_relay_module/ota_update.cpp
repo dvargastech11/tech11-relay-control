@@ -10,8 +10,20 @@ String lastUpdateCheckResult = "Not checked yet.";
 String fetchRemoteVersion() {
   WiFiClientSecure client;
   client.setInsecure(); // see README note on cert pinning for production
+
+  // GitHub's raw content servers (raw.githubusercontent.com) sit behind a
+  // CDN that caches responses for a few minutes. Without cache-busting,
+  // checking right after publishing a new version can return a stale
+  // cached copy of version.txt, making a genuinely available update look
+  // like "up to date". Appending a changing query param + explicit
+  // no-cache headers reliably bypasses that cache.
+  String url = String(GITHUB_VERSION_URL) + "?cachebust=" + String(millis());
+
   HTTPClient http;
-  http.begin(client, GITHUB_VERSION_URL);
+  http.begin(client, url);
+  http.addHeader("Cache-Control", "no-cache");
+  http.addHeader("Pragma", "no-cache");
+
   String result = "";
   if (http.GET() == 200) {
     result = http.getString();
@@ -25,7 +37,9 @@ void performGitHubUpdate() {
   WiFiClientSecure client;
   client.setInsecure();
   httpUpdate.rebootOnUpdate(true);
-  t_httpUpdate_return result = httpUpdate.update(client, GITHUB_FIRMWARE_URL);
+
+  String url = String(GITHUB_FIRMWARE_URL) + "?cachebust=" + String(millis());
+  t_httpUpdate_return result = httpUpdate.update(client, url);
 
   if (result == HTTP_UPDATE_FAILED) {
     lastUpdateCheckResult = "Update FAILED: " + httpUpdate.getLastErrorString();
