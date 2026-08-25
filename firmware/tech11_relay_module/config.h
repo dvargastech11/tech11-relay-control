@@ -57,16 +57,10 @@
 #define RELAY_ACTIVE_LEVEL LOW    // ACEIRMC 16-channel relay board is low-level trigger
 #define RELAY_INACTIVE_LEVEL HIGH
 
-// I2C addresses for the 3 MCP23017 boards, confirmed via i2c_scanner.ino
-// testing. Full 8-combination table (each switch subtracts a fixed value
-// from the 0x27 baseline): OFF/OFF/OFF=0x27, ON/OFF/OFF=0x26, OFF/ON/OFF=
-// 0x25, ON/ON/OFF=0x24, OFF/OFF/ON=0x23, ON/OFF/ON=0x22, OFF/ON/ON=0x21,
-// ON/ON/ON=0x20. Using the simplest single-switch combos for the 3 boards:
-//   Board 1: switches all OFF        -> 0x27
-//   Board 2: switch 1 ON, others OFF -> 0x26
-//   Board 3: switch 2 ON, others OFF -> 0x25
-#define MCP23017_ADDR_1 0x27  // relays 1-16
-#define MCP23017_ADDR_2 0x26  // relays 17-32
-#define MCP23017_ADDR_3 0x25  // relays 33-47, only 15 of 16 channels used
+// MCP23017 board addressing is AUTO-DISCOVERED at boot (see relay_control.cpp's
+// scanMCPBoards()) - it scans the full valid address range (0x20-0x27) and
+// assigns whichever boards respond, in ascending address order, as Board
+// 1/2/3. No manual address configuration needed here anymore - just set
+// each board's DIP switches to any 3 distinct addresses within 0x20-0x27.
 
 #endif

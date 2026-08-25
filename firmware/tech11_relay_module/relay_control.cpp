@@ -9,10 +9,20 @@
   channel 48 is spare hardware capacity, still testable via the diagnostic
   page but never reachable through the production /trigger endpoint.
   ---------------------------------------------------------------------------
-  Boards that aren't physically present/wired yet (e.g. only 1 of 3
-  MCP23017s installed so far) are detected via scanMCPBoards() and simply
-  skipped during init/writes rather than causing I2C errors or hangs - this
-  lets you bring boards online incrementally as hardware arrives.
+  BOARD ADDRESSING IS AUTO-DISCOVERED, not hardcoded. On boot,
+  scanMCPBoards() probes every valid MCP23017 address (0x20-0x27, the full
+  range covered by the A0/A1/A2 address pins) and takes whichever ones
+  respond, in ascending address order, as Board 1/2/3. This means boards
+  can be set to ANY valid address via their DIP switches - no need to
+  determine a specific address and hardcode it in config.h, and no need
+  to keep boards in a specific physical order. Only the first
+  NUM_MCP_BOARDS (3) found are used; if more than 3 respond, the extras
+  are logged and ignored.
+
+  Boards that aren't physically present/wired yet are simply not found
+  during the scan and are skipped during init/writes rather than causing
+  I2C errors or hangs - this lets you bring boards online incrementally as
+  hardware arrives.
 
   Timing is millis()-based and checked in updateRelayTimers() from the main
   loop() - NOT FreeRTOS tasks, since two tasks hitting the shared I2C bus
@@ -25,7 +35,11 @@
 #define MCP_GPIOA  0x12
 #define MCP_GPIOB  0x13
 
-static const uint8_t mcpAddresses[NUM_MCP_BOARDS] = { MCP23017_ADDR_1, MCP23017_ADDR_2, MCP23017_ADDR_3 };
+// Full valid MCP23017 address range (A0/A1/A2 pins give 8 combinations)
+#define MCP23017_SCAN_START 0x20
+#define MCP23017_SCAN_END   0x27
+
+static uint8_t discoveredAddresses[NUM_MCP_BOARDS] = { 0, 0, 0 };
 static bool boardOnline[NUM_MCP_BOARDS] = { false, false, false };
 
 // Per-channel non-blocking timer state - sized to full hardware capacity
@@ -40,7 +54,7 @@ static void resolveChannel(int channelNum, uint8_t &address, uint8_t &reg, uint8
   int boardIndex = idx / 16;
   int pinOnBoard = idx % 16;
 
-  address = mcpAddresses[boardIndex];
+  address = discoveredAddresses[boardIndex];
   reg = (pinOnBoard < 8) ? MCP_GPIOA : MCP_GPIOB;
   bit = pinOnBoard % 8;
   boardIndexOut = boardIndex;
@@ -72,12 +86,35 @@ static void setChannelBit(uint8_t address, uint8_t reg, uint8_t bit, bool high) 
 }
 
 void scanMCPBoards() {
-  for (int b = 0; b < NUM_MCP_BOARDS; b++) {
-    Wire.beginTransmission(mcpAddresses[b]);
+  // Reset state before rescanning
+  for (int i = 0; i < NUM_MCP_BOARDS; i++) {
+    discoveredAddresses[i] = 0;
+    boardOnline[i] = false;
+  }
+
+  int foundCount = 0;
+  Serial.println("[MCP] Scanning I2C addresses 0x20-0x27 for MCP23017 boards...");
+
+  for (uint8_t addr = MCP23017_SCAN_START; addr <= MCP23017_SCAN_END; addr++) {
+    Wire.beginTransmission(addr);
     uint8_t result = Wire.endTransmission();
-    boardOnline[b] = (result == 0);
-    Serial.printf("[MCP] Board %d (0x%02X): %s\n", b + 1, mcpAddresses[b],
-                  boardOnline[b] ? "online" : "not detected");
+
+    if (result == 0) {
+      if (foundCount < NUM_MCP_BOARDS) {
+        discoveredAddresses[foundCount] = addr;
+        boardOnline[foundCount] = true;
+        Serial.printf("[MCP] Found board at 0x%02X -> assigned as Board %d (relays %d-%d)\n",
+                      addr, foundCount + 1, foundCount * 16 + 1, foundCount * 16 + 16);
+      } else {
+        Serial.printf("[MCP] Found board at 0x%02X but all %d board slots are already filled - ignoring\n",
+                      addr, NUM_MCP_BOARDS);
+      }
+      foundCount++;
+    }
+  }
+
+  for (int i = foundCount; i < NUM_MCP_BOARDS; i++) {
+    Serial.printf("[MCP] Board %d: not detected (fewer than %d boards found on the bus)\n", i + 1, NUM_MCP_BOARDS);
   }
 }
 
@@ -88,7 +125,7 @@ bool isBoardOnline(int boardIndex) {
 
 uint8_t getBoardAddress(int boardIndex) {
   if (boardIndex < 0 || boardIndex >= NUM_MCP_BOARDS) return 0;
-  return mcpAddresses[boardIndex];
+  return discoveredAddresses[boardIndex];
 }
 
 void setupRelayPins() {
@@ -102,11 +139,11 @@ void setupRelayPins() {
     if (!boardOnline[b]) continue; // skip boards not physically present yet
 
     // All 16 pins as outputs (IODIR bit 0 = output)
-    mcpWriteRegister(mcpAddresses[b], MCP_IODIRA, 0x00);
-    mcpWriteRegister(mcpAddresses[b], MCP_IODIRB, 0x00);
+    mcpWriteRegister(discoveredAddresses[b], MCP_IODIRA, 0x00);
+    mcpWriteRegister(discoveredAddresses[b], MCP_IODIRB, 0x00);
     // Start all pins at the inactive level
-    mcpWriteRegister(mcpAddresses[b], MCP_GPIOA, inactiveByte);
-    mcpWriteRegister(mcpAddresses[b], MCP_GPIOB, inactiveByte);
+    mcpWriteRegister(discoveredAddresses[b], MCP_GPIOA, inactiveByte);
+    mcpWriteRegister(discoveredAddresses[b], MCP_GPIOB, inactiveByte);
   }
 
   for (int i = 0; i < HARDWARE_CHANNELS; i++) {
