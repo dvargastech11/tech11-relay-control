@@ -1,0 +1,80 @@
+name: Build Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  firmware-compile:
+    name: Compile ESP32 Firmware
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install arduino-cli
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+          echo "$PWD/bin" >> $GITHUB_PATH
+
+      - name: Configure arduino-cli and add ESP32 board index
+        run: |
+          arduino-cli config init --overwrite
+          arduino-cli config add board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+          arduino-cli core update-index
+
+      - name: Install ESP32 core (pinned to stable 3.0.7 - NOT latest/alpha)
+        run: arduino-cli core install esp32:esp32@3.0.7
+
+      - name: Install required libraries
+        run: arduino-cli lib install ArduinoJson
+
+      - name: Compile tech11_relay_module
+        run: |
+          arduino-cli compile \
+            --fqbn esp32:esp32:esp32:PartitionScheme=min_spiffs \
+            --warnings all \
+            firmware/tech11_relay_module
+
+      - name: Compile i2c_scanner (utility sketch)
+        run: |
+          arduino-cli compile \
+            --fqbn esp32:esp32:esp32 \
+            firmware/i2c_scanner
+
+  flask-validate:
+    name: Validate Flask Server (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        working-directory: flask-server
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install flask requests flask-login werkzeug waitress psutil pywin32
+
+      - name: Run pywin32 post-install (registers win32com etc.)
+        run: |
+          $scripts = python -c "import sysconfig; print(sysconfig.get_path('scripts'))"
+          python "$scripts\pywin32_postinstall.py" -install
+
+      - name: Byte-compile check (catches syntax errors in every .py file)
+        working-directory: flask-server
+        run: python -m py_compile app.py building_store.py devices.py device_config_store.py windows_auth.py run_production.py
+
+      - name: Import check (catches missing imports, indentation issues, top-level errors that py_compile alone can miss)
+        working-directory: flask-server
+        run: python -c "import app; print('app.py imported successfully')"
+
+      - name: Validate all Jinja templates parse without syntax errors
+        working-directory: flask-server
+        run: python ../.github/scripts/validate_templates.py
