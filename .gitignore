@@ -18,3 +18,10 @@ build/
 # depend on these actually being in the repo).
 !firmware/firmware.bin
 !firmware/releases/*.bin
+
+# PyInstaller build output - compiled binaries are published via GitHub
+# Releases instead of being committed here (keeps repo size sane, and
+# Releases page is the natural place users look for a download anyway)
+tools/dist/
+tools/build/
+*.spec.bak
