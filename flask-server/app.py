@@ -97,6 +97,7 @@ def logout():
 
 import building_store as bstore
 import devices as devsvc
+import device_config_store as devcfg
 
 REQUEST_TIMEOUT_SEC = 3
 HOLD_MS = 5000  # fixed 5 second hold for all floor buttons
@@ -322,6 +323,16 @@ def devices_page():
                 )
                 uptime_formatted = format_uptime(status.get("uptimeSec")) if (online and status) else None
 
+                config_drift = {}
+                if online and status:
+                    mac = elevator["device_mac"]
+                    if devcfg.get_canonical_config(mac) is None:
+                        # First time we've ever seen this device - treat its
+                        # current live config as the canonical baseline.
+                        devcfg.backup_config(mac, status)
+                    else:
+                        config_drift = devcfg.check_drift(mac, status)
+
                 assigned.append({
                     "building_name": building["name"],
                     "building_id": building["id"],
@@ -334,6 +345,7 @@ def devices_page():
                     "firmware_version": device_version,
                     "uptime_formatted": uptime_formatted,
                     "update_available": update_available,
+                    "config_drift": config_drift,
                 })
 
     discovered = devsvc.discover_devices()
@@ -415,6 +427,32 @@ def devices_reboot():
     return jsonify({"success": success})
 
 
+@app.route("/devices/resync", methods=["POST"])
+@admin_required
+def devices_resync():
+    """Pushes the server's canonical config back to a device, overwriting
+    whatever it's currently running - the server always wins."""
+    ip = request.form.get("ip")
+    mac = request.form.get("mac")
+
+    canonical = devcfg.get_canonical_config(mac)
+    if not canonical:
+        return jsonify({"success": False, "error": "No canonical config on file for this device to restore."})
+
+    payload = {}
+    for field in devcfg.TRACKED_FIELDS:
+        value = canonical.get(field)
+        if value is None:
+            continue
+        payload["deviceName" if field == "name" else field] = value
+
+    success = devsvc.update_network(ip, mac, payload)
+
+    if success:
+        return jsonify({"success": True, "message": "Server config pushed - device is rebooting to apply it."})
+    return jsonify({"success": False, "error": "Could not reach device to push the config."})
+
+
 @app.route("/devices/network", methods=["GET", "POST"])
 @admin_required
 def devices_network():
@@ -431,6 +469,22 @@ def devices_network():
             "subnet": request.form.get("sn"),
         }
         success = devsvc.update_network(ip, mac, payload)
+
+        if success:
+            # This was an intentional, server-initiated change - update the
+            # canonical backup to match, so future drift checks compare
+            # against this new state, not the old one.
+            backup_status = {
+                "name": payload["deviceName"],
+                "useDHCP": payload["useDHCP"],
+                "staticIP": payload["staticIP"],
+                "gateway": payload["gateway"],
+                "subnet": payload["subnet"],
+            }
+            existing = devcfg.get_canonical_config(mac) or {}
+            existing.update({k: v for k, v in backup_status.items() if v})
+            devcfg.backup_config(mac, existing)
+
         flash("Settings sent - device is rebooting. Refresh the Devices page in a moment to see its new IP."
               if success else "Failed to reach device.")
         return redirect(url_for("devices_page"))
@@ -610,6 +664,10 @@ def admin_assign_device(building_id, elevator_number):
             pushed_ok = False
             if device_name and not firmware_pushed:
                 pushed_ok = devsvc.update_network(ip, mac, {"deviceName": device_name})
+                if pushed_ok:
+                    existing = devcfg.get_canonical_config(mac) or {}
+                    existing["name"] = device_name
+                    devcfg.backup_config(mac, existing)
 
             if firmware_pushed:
                 flash(f"Device assigned to elevator {elevator_number}. It was running outdated firmware "

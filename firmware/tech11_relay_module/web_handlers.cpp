@@ -557,15 +557,19 @@ static void handleTestStop() {
 static void handleStatus() {
   if (!checkApiKey()) return;
 
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<768> doc;
   doc["name"] = deviceName;
   doc["ip"] = isInAPMode ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
   doc["mac"] = WiFi.macAddress();
   doc["firmwareVersion"] = CURRENT_FIRMWARE_VERSION;
   doc["uptimeSec"] = millis() / 1000;
   doc["useDHCP"] = useDHCP;
+  doc["staticIP"] = staticIP.toString(); // the CONFIGURED static IP, not necessarily the live IP if in DHCP mode
   doc["gateway"] = gatewayIP.toString();
   doc["subnet"] = subnetMask.toString();
+  doc["dns1"] = dns1.toString();
+  doc["dns2"] = dns2.toString();
+  doc["ntpServer"] = ntpServer;
   doc["rssi"] = WiFi.RSSI();
 
   String output;

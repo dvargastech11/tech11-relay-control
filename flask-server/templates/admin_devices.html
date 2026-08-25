@@ -30,6 +30,7 @@
         <th style="padding:8px;">IP</th>
         <th style="padding:8px;">Uptime</th>
         <th style="padding:8px;">Firmware</th>
+        <th style="padding:8px;">Config</th>
         <th style="padding:8px;">Actions</th>
       </tr>
       {% for d in assigned %}
@@ -54,6 +55,19 @@
             <span style="color:#666;">-</span>
           {% endif %}
         </td>
+        <td style="padding:8px;">
+          {% if not d.online %}
+            <span style="color:#666;">-</span>
+          {% elif d.config_drift %}
+            <span style="color:#e74c3c; font-size:11px;" title="{% for field, (canon, live) in d.config_drift.items() %}{{ field }}: server={{ canon }}, device={{ live }}&#10;{% endfor %}">
+              &#9888; {{ d.config_drift|length }} field(s) differ from server
+            </span>
+            <button onclick="resync('{{ d.ip }}','{{ d.mac }}')" style="display:block; margin-top:4px; padding:4px 8px;
+              border:none; border-radius:6px; background:#2d6cdf; color:white; cursor:pointer; font-size:11px;">Resync from Server</button>
+          {% else %}
+            <span style="color:#2fbf4f; font-size:11px;">in sync</span>
+          {% endif %}
+        </td>
         <td style="padding:8px; white-space:nowrap;">
           <button onclick="reboot('{{ d.ip }}','{{ d.mac }}')" style="padding:6px 10px; border:none;
             border-radius:6px; background:#7a1f1f; color:white; cursor:pointer; font-size:12px;">Reboot</button>
@@ -62,7 +76,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="7" style="padding:12px; color:#888;">No devices assigned yet.</td></tr>
+      <tr><td colspan="8" style="padding:12px; color:#888;">No devices assigned yet.</td></tr>
       {% endfor %}
     </table>
 
@@ -125,6 +139,17 @@
       const r = await fetch('/devices/reboot', {method: 'POST', body: fd});
       const data = await r.json();
       alert(data.success ? 'Reboot command sent.' : 'Failed to reach device.');
+    }
+
+    async function resync(ip, mac) {
+      if (!confirm('Push the server\'s stored config to this device, overwriting its current settings? It will reboot.')) return;
+      const fd = new FormData();
+      fd.append('ip', ip);
+      fd.append('mac', mac);
+      const r = await fetch('/devices/resync', {method: 'POST', body: fd});
+      const data = await r.json();
+      alert(data.success ? data.message : ('Failed: ' + (data.error || 'unknown error')));
+      if (data.success) window.location.reload();
     }
 
     function goAssign(form, mac, ip, name) {
