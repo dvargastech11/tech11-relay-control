@@ -36,6 +36,7 @@
 #include "auth.h"
 #include "relay_control.h"
 #include "external_input.h"
+#include "oled_display.h"
 #include "activity_log.h"
 #include "discovery.h"
 #include "ota_update.h"
@@ -51,6 +52,7 @@ void setup() {
 
   setupRelayPins();
   setupExternalInput();
+  setupOledDisplay();
   loadNetworkConfig();
   loadAuthConfig();
   setupNetworkWithFallback(); // tries WiFi STA first, falls back to setup AP
@@ -86,6 +88,7 @@ void loop() {
   updateRelayTimers();
   updateTestMode();
   updateExternalInput();
+  updateOledDisplay();
 
   if (!isInAPMode) {
     ArduinoOTA.handle();

@@ -71,4 +71,12 @@
 #define EXTERNAL_INPUT_PIN 4
 #define EXTERNAL_INPUT_STUCK_THRESHOLD_MS (60UL * 60UL * 1000UL) // 1 hour
 
+// OLED status display (SSD1306, 128x64, I2C) - shares the same I2C bus as
+// the MCP23017 relay boards (SDA=GPIO21, SCL=GPIO22). Address 0x3C doesn't
+// conflict with the MCP23017 range (0x20-0x27). Shows the 4 most recent
+// production floor-call requests.
+#define OLED_I2C_ADDRESS 0x3C
+#define OLED_WIDTH 128
+#define OLED_HEIGHT 64
+
 #endif
