@@ -1,9 +1,10 @@
 <#
 .SYNOPSIS
     Compiles the Tech 11 relay module firmware once, then flashes it to
-    an unlimited number of ESP32 devices, one at a time - auto-detecting
-    each device's COM port rather than requiring you to look it up and
-    type it manually every time.
+    an unlimited number of ESP32 devices, one at a time, using the SAME
+    COM port for every device (asked once up front) - for the common
+    workflow of swapping boards in/out of the same USB connector rather
+    than plugging into different physical ports each time.
 
 .DESCRIPTION
     Every USB flash does a FULL FLASH ERASE first (EraseFlash=all), wiping
@@ -13,7 +14,7 @@
     before. OTA updates (GitHub self-check or the website's push-firmware
     feature) do NOT erase NVS - only manual USB flashing does.
 
-    Runs indefinitely - keep connecting devices one after another. Type
+    Runs indefinitely - keep swapping devices in on the same port. Type
     'q' at any "connect the next device" prompt to stop.
 
 .EXAMPLE
@@ -25,10 +26,6 @@ $BuildDir    = ".\build_output"
 $CompileFqbn = "esp32:esp32:esp32:PartitionScheme=min_spiffs"
 $UploadFqbn  = "esp32:esp32:esp32:PartitionScheme=min_spiffs,EraseFlash=all"
 
-function Get-ComPorts {
-    [System.IO.Ports.SerialPort]::GetPortNames() | Sort-Object
-}
-
 Write-Host "`n=== Compiling firmware (once) ===" -ForegroundColor Cyan
 arduino-cli compile --fqbn $CompileFqbn --output-dir $BuildDir $SketchDir
 
@@ -38,6 +35,14 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "`nCompiled successfully." -ForegroundColor Green
+
+$port = Read-Host "`nEnter the COM port to use for all devices (e.g. COM6)"
+if ([string]::IsNullOrWhiteSpace($port)) {
+    Write-Host "No port given - aborting." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Using $port for every device." -ForegroundColor Green
 Write-Host "Each flash does a FULL erase first (factory reset - wipes old WiFi/network config)." -ForegroundColor Yellow
 Write-Host "Type 'q' at any prompt below to stop.`n" -ForegroundColor Yellow
 
@@ -45,37 +50,11 @@ $deviceNum = 0
 
 while ($true) {
     $deviceNum++
-    Write-Host "=== Device $deviceNum ===" -ForegroundColor Cyan
-
-    $beforePorts = Get-ComPorts
-    $response = Read-Host "Connect the next ESP32 via USB, then press Enter (or type 'q' to quit)"
+    Write-Host "=== Device $deviceNum ($port) ===" -ForegroundColor Cyan
+    $response = Read-Host "Connect the next ESP32 on $port, then press Enter (or type 'q' to quit)"
 
     if ($response -eq "q") {
         break
-    }
-
-    # Give Windows a moment to finish enumerating the newly connected device
-    Start-Sleep -Seconds 2
-    $afterPorts = Get-ComPorts
-    $newPorts = $afterPorts | Where-Object { $beforePorts -notcontains $_ }
-
-    $port = $null
-    if ($newPorts.Count -eq 1) {
-        $port = $newPorts[0]
-        Write-Host "Auto-detected device on $port" -ForegroundColor Green
-    } elseif ($newPorts.Count -gt 1) {
-        Write-Host "Multiple new ports appeared: $($newPorts -join ', ')" -ForegroundColor Yellow
-        $port = Read-Host "Type which one to use"
-    } else {
-        Write-Host "Couldn't auto-detect a new port (maybe it was already plugged in, or drivers are still loading)." -ForegroundColor Yellow
-        $port = Read-Host "Enter the COM port manually (e.g. COM6), or 'q' to quit"
-        if ($port -eq "q") { break }
-    }
-
-    if ([string]::IsNullOrWhiteSpace($port)) {
-        Write-Host "No port given - skipping this device.`n" -ForegroundColor Yellow
-        $deviceNum--
-        continue
     }
 
     arduino-cli upload -p $port --fqbn $UploadFqbn --input-dir $BuildDir $SketchDir
@@ -90,4 +69,4 @@ while ($true) {
     }
 }
 
-Write-Host "`n=== Done - flashed $($deviceNum - 1) device(s) this session ===" -ForegroundColor Cyan
+Write-Host "`n=== Done - flashed $($deviceNum - 1) device(s) this session on $port ===" -ForegroundColor Cyan
