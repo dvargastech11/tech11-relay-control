@@ -99,6 +99,7 @@ import building_store as bstore
 import devices as devsvc
 import device_config_store as devcfg
 import nxwitness_config as nxcfg
+import pending_changes_store as pending
 
 REQUEST_TIMEOUT_SEC = 3
 HOLD_MS = 5000  # fixed 5 second hold for all floor buttons
@@ -348,13 +349,39 @@ def devices_page():
                 uptime_formatted = format_uptime(status.get("uptimeSec")) if (online and status) else None
 
                 config_drift = {}
+                pending_applied = False
                 if online and status:
                     mac = elevator["device_mac"]
+                    ip = elevator["device_ip"]
+
+                    # If a change was queued while this device was offline,
+                    # apply it now that we can actually reach it.
+                    queued_payload = pending.get_pending_change(mac)
+                    if queued_payload:
+                        if devsvc.update_network(ip, mac, queued_payload):
+                            pending.clear_pending_change(mac)
+                            existing = devcfg.get_canonical_config(mac) or {}
+                            backup_status = {
+                                "name": queued_payload.get("deviceName"),
+                                "useDHCP": queued_payload.get("useDHCP"),
+                                "staticIP": queued_payload.get("staticIP"),
+                                "gateway": queued_payload.get("gateway"),
+                                "subnet": queued_payload.get("subnet"),
+                            }
+                            existing.update({k: v for k, v in backup_status.items() if v is not None})
+                            devcfg.backup_config(mac, existing)
+                            pending_applied = True
+                        # If the push fails despite the device appearing online
+                        # (rare race), just leave it queued - next poll retries.
+
                     if devcfg.get_canonical_config(mac) is None:
                         # First time we've ever seen this device - treat its
                         # current live config as the canonical baseline.
                         devcfg.backup_config(mac, status)
-                    else:
+                    elif not pending_applied:
+                        # Skip drift-checking on the same pass we just applied
+                        # a pending change - the device is rebooting to apply
+                        # it, so a live status re-check would be stale anyway.
                         config_drift = devcfg.check_drift(mac, status)
 
                 assigned.append({
@@ -369,6 +396,8 @@ def devices_page():
                     "firmware_version": device_version,
                     "uptime_formatted": uptime_formatted,
                     "update_available": update_available,
+                    "pending_change": pending.has_pending_change(elevator["device_mac"]),
+                    "pending_applied": pending_applied,
                     "config_drift": config_drift,
                 })
 
@@ -555,9 +584,16 @@ def devices_network():
             existing = devcfg.get_canonical_config(mac) or {}
             existing.update({k: v for k, v in backup_status.items() if v})
             devcfg.backup_config(mac, existing)
-
-        flash("Settings sent - device is rebooting. Refresh the Devices page in a moment to see its new IP."
-              if success else "Failed to reach device.")
+            pending.clear_pending_change(mac)  # in case an older queued change is now superseded
+            flash("Settings sent - device is rebooting. Refresh the Devices page in a moment to see its new IP.")
+        else:
+            # Device unreachable right now - this is a live push, not a
+            # queue the device itself checks, so the change would otherwise
+            # just be lost. Queue it instead - it gets applied automatically
+            # the next time the Devices page sees this device come online.
+            pending.queue_change(mac, payload)
+            flash("Device is offline right now - change queued, and will be applied automatically "
+                  "the next time it's seen online.")
         return redirect(url_for("devices_page"))
 
     online, status = devsvc.poll_status(ip, mac)

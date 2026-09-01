@@ -56,7 +56,11 @@
           {% endif %}
         </td>
         <td style="padding:8px;">
-          {% if not d.online %}
+          {% if d.pending_applied %}
+            <span style="color:#2d6cdf; font-size:11px;">&#8635; Queued change applied - rebooting...</span>
+          {% elif not d.online and d.pending_change %}
+            <span style="color:#e0a800; font-size:11px;">&#8987; Change queued - will apply when it's back online</span>
+          {% elif not d.online %}
             <span style="color:#666;">-</span>
           {% elif d.config_drift %}
             <span style="color:#e74c3c; font-size:11px;" title="{% for field, (canon, live) in d.config_drift.items() %}{{ field }}: server={{ canon }}, device={{ live }}&#10;{% endfor %}">
