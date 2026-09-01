@@ -14,7 +14,7 @@ param(
     [int]$DeviceCount = 12
 )
 
-$SketchDir = "C:\Users\alejo\OneDrive\GIT\tech11-relay-control\firmware\tech11_relay_module"
+$SketchDir = Join-Path $PSScriptRoot "firmware\tech11_relay_module"
 $BuildDir  = ".\build_output"
 $Fqbn      = "esp32:esp32:esp32:PartitionScheme=min_spiffs"
 
