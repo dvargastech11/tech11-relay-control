@@ -85,3 +85,15 @@ def check_drift(mac, live_status):
 
 def list_all_backed_up_macs():
     return list(_load_all().keys())
+
+
+def delete_config(mac):
+    """Fully removes a MAC's canonical config backup - used when a device
+    is unassigned/deleted, so the server doesn't keep remembering its old
+    name/settings indefinitely after it's no longer in use."""
+    data = _load_all()
+    if mac.upper() in data:
+        del data[mac.upper()]
+        _save_all(data)
+        return True
+    return False

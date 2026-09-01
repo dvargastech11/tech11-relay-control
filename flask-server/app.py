@@ -510,11 +510,20 @@ def devices_resync():
 @admin_required
 def admin_unassign_device(building_id, elevator_number):
     data = bstore.load_data()
+
+    building = bstore.get_building(data, building_id)
+    elevator = bstore.get_elevator(building, elevator_number) if building else None
+    mac = elevator.get("device_mac") if elevator else None
+
     success = bstore.unassign_device(data, building_id, elevator_number)
+
     if success:
-        flash(f"Device unassigned from elevator {elevator_number}. It will show up under "
-              f"Unassigned Devices again on next scan if it's still online - its saved server "
-              f"config stays on file in case you reassign it later.")
+        if mac:
+            devcfg.delete_config(mac)
+            pending.clear_pending_change(mac)
+        flash(f"Device unassigned from elevator {elevator_number} and its saved server data "
+              f"(remembered name/config) has been wiped. It will show up under Unassigned "
+              f"Devices again on next scan if it's still online.")
     else:
         flash("Could not find that elevator to unassign.")
     return redirect(url_for("devices_page"))
