@@ -105,8 +105,10 @@ void saveWifiCredentials(String ssid, String password) {
 // ---- WiFi STA (PRIMARY connection, temporarily restored) ----
 
 bool connectToWiFi() {
+  WiFi.mode(WIFI_STA); // must come BEFORE WiFi.config() - the STA interface
+                       // doesn't exist yet otherwise, and WiFi.config()
+                       // silently fails to apply a static IP if called too early
   if (!useDHCP) WiFi.config(staticIP, gatewayIP, subnetMask, dns1, dns2);
-  WiFi.mode(WIFI_STA);
   WiFi.setHostname(deviceName.c_str());
   WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
 
