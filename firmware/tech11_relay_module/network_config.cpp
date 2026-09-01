@@ -112,7 +112,28 @@ bool connectToWiFi() {
 
   unsigned long start = millis();
   while (WiFi.status() != WL_CONNECTED) {
-    if (millis() - start > WIFI_CONNECT_TIMEOUT_MS) return false;
+    if (millis() - start > WIFI_CONNECT_TIMEOUT_MS) {
+      if (!useDHCP) return false; // static config already failed - nothing else to try
+
+      // DHCP didn't provide a lease within the timeout - retry once with a
+      // known static fallback address so the device stays reachable on the
+      // main network instead of being stuck unreachable (or only reachable
+      // via its own isolated AP setup network if this also fails).
+      Serial.println("[WIFI] DHCP timed out - retrying with static fallback 192.168.4.1");
+      IPAddress fallbackIP(192, 168, 4, 1);
+      IPAddress fallbackGateway(192, 168, 4, 1);
+      IPAddress fallbackSubnet(255, 255, 255, 0);
+      WiFi.disconnect();
+      WiFi.config(fallbackIP, fallbackGateway, fallbackSubnet, dns1, dns2);
+      WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
+
+      unsigned long fallbackStart = millis();
+      while (WiFi.status() != WL_CONNECTED) {
+        if (millis() - fallbackStart > WIFI_CONNECT_TIMEOUT_MS) return false;
+        delay(300);
+      }
+      return true;
+    }
     delay(300);
   }
   return true;
