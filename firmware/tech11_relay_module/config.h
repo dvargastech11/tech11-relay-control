@@ -15,7 +15,7 @@
 #define MASTER_SECRET "Tech11-Master-Secret-ChangeThisBeforeProduction-2026"
 
 // GitHub OTA source (public repo raw content URLs)
-#define CURRENT_FIRMWARE_VERSION "1.5"
+#define CURRENT_FIRMWARE_VERSION "1.0.0"
 #define GITHUB_VERSION_URL  "https://raw.githubusercontent.com/dvargastech11/tech11-relay-control/main/firmware/version.txt"
 #define GITHUB_FIRMWARE_URL "https://raw.githubusercontent.com/dvargastech11/tech11-relay-control/main/firmware/firmware.bin"
 
@@ -83,13 +83,5 @@
 // sensing input for something else in the system.
 #define EXTERNAL_INPUT_PIN 4
 #define EXTERNAL_INPUT_STUCK_THRESHOLD_MS (60UL * 60UL * 1000UL) // 1 hour
-
-// OLED status display (SSD1306, 128x64, I2C) - shares the same I2C bus as
-// the MCP23017 relay boards (SDA=GPIO21, SCL=GPIO22). Address 0x3C doesn't
-// conflict with the MCP23017 range (0x20-0x27). Shows the 4 most recent
-// production floor-call requests.
-#define OLED_I2C_ADDRESS 0x3C
-#define OLED_WIDTH 128
-#define OLED_HEIGHT 64
 
 #endif

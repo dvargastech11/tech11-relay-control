@@ -3,9 +3,15 @@
     Builds, versions, and publishes the Tech 11 relay module firmware.
 
 .DESCRIPTION
-    - Reads the current version from firmware/version.txt (creates it at
-      1.5 if it doesn't exist yet)
-    - Increments the version (minor bump) unless -Version is given explicitly
+    Versioning scheme: main.overhaul.small
+      - main:     a fundamentally new generation of the firmware
+      - overhaul: a significant restructuring/rework of existing behavior
+      - small:    routine fixes and minor changes (the default bump)
+
+    - Reads the current version from firmware/version.txt (starts at
+      1.0.0 if it doesn't exist yet)
+    - Bumps ONE part per the -Bump parameter (default: small), resetting
+      the parts below it to 0 (e.g. an overhaul bump resets small to 0)
     - Updates CURRENT_FIRMWARE_VERSION in config.h to match
     - Compiles the sketch via arduino-cli
     - Copies the compiled .bin to firmware/firmware.bin (the exact path the
@@ -14,15 +20,22 @@
     - Updates firmware/version.txt
     - Commits and pushes everything to GitHub
 
+.PARAMETER Bump
+    Which part of main.overhaul.small to increment. Default: small.
+
 .PARAMETER Version
-    Optional. Set an explicit version (e.g. "2.0") instead of auto-incrementing.
+    Optional. Set an explicit version (e.g. "2.0.0") instead of bumping.
 
 .EXAMPLE
     .\build_and_release_firmware.ps1
-    .\build_and_release_firmware.ps1 -Version "2.0"
+    .\build_and_release_firmware.ps1 -Bump overhaul
+    .\build_and_release_firmware.ps1 -Bump main
+    .\build_and_release_firmware.ps1 -Version "2.0.0"
 #>
 
 param(
+    [ValidateSet("main", "overhaul", "small")]
+    [string]$Bump = "small",
     [string]$Version = ""
 )
 
@@ -53,15 +66,24 @@ if ($Version -ne "") {
     if (Test-Path $VersionFile) {
         $currentVersion = (Get-Content $VersionFile -Raw).Trim()
     } else {
-        $currentVersion = "1.4"  # so the first auto-increment lands on 1.5
+        $currentVersion = "1.0.0"
     }
 
     $parts = $currentVersion.Split(".")
-    $major = [int]$parts[0]
-    $minor = [int]$parts[1]
-    $minor++
-    $newVersion = "$major.$minor"
-    Write-Host "Auto-incrementing: $currentVersion -> $newVersion" -ForegroundColor Yellow
+    # Tolerate an old-style two-part version (e.g. "1.5") left over from
+    # before this scheme - treat the missing third part as 0.
+    $mainPart     = [int]$parts[0]
+    $overhaulPart = if ($parts.Count -gt 1) { [int]$parts[1] } else { 0 }
+    $smallPart    = if ($parts.Count -gt 2) { [int]$parts[2] } else { 0 }
+
+    switch ($Bump) {
+        "main"     { $mainPart++; $overhaulPart = 0; $smallPart = 0 }
+        "overhaul" { $overhaulPart++; $smallPart = 0 }
+        "small"    { $smallPart++ }
+    }
+
+    $newVersion = "$mainPart.$overhaulPart.$smallPart"
+    Write-Host "Bumping [$Bump]: $currentVersion -> $newVersion" -ForegroundColor Yellow
 }
 
 # ============================================================
