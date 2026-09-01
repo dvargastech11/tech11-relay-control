@@ -29,7 +29,7 @@ jobs:
         run: arduino-cli core install esp32:esp32@3.0.7
 
       - name: Install required libraries
-        run: arduino-cli lib install ArduinoJson
+        run: arduino-cli lib install ArduinoJson "Adafruit SSD1306" "Adafruit GFX Library"
 
       - name: Compile tech11_relay_module
         run: |
