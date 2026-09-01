@@ -6,7 +6,7 @@
 extern Preferences prefs; // defined in the main .ino, shared with auth.cpp
 
 String deviceName;
-bool useDHCP = false;
+bool useDHCP = true;
 IPAddress staticIP(192, 168, 55, 230);
 IPAddress gatewayIP(192, 168, 55, 1);
 IPAddress subnetMask(255, 255, 255, 0);
@@ -51,19 +51,21 @@ String generateDeviceName() {
 void loadNetworkConfig() {
   prefs.begin("netcfg", true);
   deviceName = prefs.getString("devname", "");
-  useDHCP = prefs.getBool("dhcp", false);
+  useDHCP = prefs.getBool("dhcp", true);
   staticIP.fromString(prefs.getString("ip", staticIP.toString()));
   gatewayIP.fromString(prefs.getString("gw", gatewayIP.toString()));
   subnetMask.fromString(prefs.getString("sn", subnetMask.toString()));
   dns1.fromString(prefs.getString("dns1", dns1.toString()));
   dns2.fromString(prefs.getString("dns2", dns2.toString()));
   ntpServer = prefs.getString("ntp", NTP_SERVER);
-  // Empty defaults (not a hardcoded network) - a fresh device with no
-  // saved credentials will fail to connect immediately and fall into AP
-  // fallback mode, which is the intended "always starts in AP mode until
-  // configured" behavior for base firmware.
-  wifiSSID = prefs.getString("wifissid", "");
-  wifiPassword = prefs.getString("wifipass", "");
+  // Project default (Tech11 network) - a fresh device with no saved
+  // credentials yet connects straight to this instead of falling into AP
+  // setup mode. Once NVS has been written (either from this default
+  // succeeding once, or via the Network Settings page), NVS always wins
+  // on every subsequent boot - this default is only ever used the very
+  // first time.
+  wifiSSID = prefs.getString("wifissid", DEFAULT_WIFI_SSID);
+  wifiPassword = prefs.getString("wifipass", DEFAULT_WIFI_PASSWORD);
   prefs.end();
   // NOTE: device name auto-generation (if empty) now happens in
   // ensureDeviceNameSet(), called AFTER the network is initialized - the

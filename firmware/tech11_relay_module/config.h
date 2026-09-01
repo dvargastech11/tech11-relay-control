@@ -25,6 +25,19 @@
 #define AP_PASSWORD "SetupPass123"
 #define WIFI_CONNECT_TIMEOUT_MS 15000UL
 
+// Project WiFi default - all 12 devices join this same dedicated network.
+// NOTE: this is a deliberate departure from the earlier "blank base
+// firmware, AP-mode-only" design - baked in here specifically so devices
+// don't each need manual AP-portal setup during mass deployment. A device
+// only falls back to a NEW value here if its NVS has never been written
+// (see loadNetworkConfig()'s defaults) - once configured (via this default
+// OR the Network Settings page), NVS always wins on subsequent boots.
+// SSID is hidden - WiFi.begin(ssid, password) actively probes for the
+// exact SSID rather than relying on a passive scan, so this connects fine
+// without any extra "hidden network" handling.
+#define DEFAULT_WIFI_SSID "Tech11"
+#define DEFAULT_WIFI_PASSWORD "Way2WiFi123$"
+
 // Ethernet (LAN8720 PHY) pinout - matches the standard RMII wiring:
 // MDC->GPIO23, MDIO->GPIO18, clock fed into GPIO0 from the board's own
 // crystal (this board has no ESP32-controlled power-enable pin, hence -1).
