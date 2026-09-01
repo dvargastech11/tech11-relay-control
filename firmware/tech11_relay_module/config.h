@@ -23,7 +23,7 @@
 // startFallbackAP(). AP_PASSWORD below is unused but kept in case password
 // protection on the setup network is wanted again later.
 #define AP_PASSWORD "SetupPass123"
-#define WIFI_CONNECT_TIMEOUT_MS 15000UL
+#define WIFI_CONNECT_TIMEOUT_MS 45000UL // hidden networks can take longer than 15s for the full probe/auth/DHCP sequence
 
 // Project WiFi default - all 12 devices join this same dedicated network.
 // NOTE: this is a deliberate departure from the earlier "blank base

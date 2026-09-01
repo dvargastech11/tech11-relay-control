@@ -477,6 +477,20 @@ def devices_resync():
     return jsonify({"success": False, "error": "Could not reach device to push the config."})
 
 
+@app.route("/admin/buildings/<building_id>/elevators/<elevator_number>/unassign-device", methods=["POST"])
+@admin_required
+def admin_unassign_device(building_id, elevator_number):
+    data = bstore.load_data()
+    success = bstore.unassign_device(data, building_id, elevator_number)
+    if success:
+        flash(f"Device unassigned from elevator {elevator_number}. It will show up under "
+              f"Unassigned Devices again on next scan if it's still online - its saved server "
+              f"config stays on file in case you reassign it later.")
+    else:
+        flash("Could not find that elevator to unassign.")
+    return redirect(url_for("devices_page"))
+
+
 @app.route("/admin/nxwitness-settings", methods=["GET", "POST"])
 @admin_required
 def admin_nxwitness_settings():

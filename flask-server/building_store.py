@@ -265,6 +265,23 @@ def assign_device(data, building_id, elevator_number, mac, ip, device_name):
     return elevator
 
 
+def unassign_device(data, building_id, elevator_number):
+    """Clears an elevator's device assignment entirely - the elevator goes
+    back to 'needs a device' and the physical unit (if still online) will
+    show back up in the Unassigned Devices list on next scan."""
+    building = get_building(data, building_id)
+    if not building:
+        return False
+    elevator = get_elevator(building, elevator_number)
+    if not elevator:
+        return False
+    elevator["device_mac"] = None
+    elevator["device_ip"] = None
+    elevator["device_name"] = None
+    save_data(data)
+    return True
+
+
 def update_floor(data, building_id, elevator_number, floor_number, **kwargs):
     """kwargs may include: enabled (bool), always_available (bool),
     schedule (dict or None), label (str)."""

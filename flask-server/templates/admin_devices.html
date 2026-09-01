@@ -73,6 +73,12 @@
             border-radius:6px; background:#7a1f1f; color:white; cursor:pointer; font-size:12px;">Reboot</button>
           <a href="/devices/network?ip={{ d.ip }}&mac={{ d.mac }}&name={{ d.name }}"
             style="color:#2d6cdf; font-size:12px; margin-left:8px;">Change IP</a>
+          <form method="POST" style="display:inline;"
+            action="/admin/buildings/{{ d.building_id }}/elevators/{{ d.elevator_number }}/unassign-device"
+            onsubmit="return confirm('Unassign this device from {{ d.building_name }} - Elevator {{ d.elevator_number }}? It stays reachable, just no longer tied to this elevator.');">
+            <button type="submit" style="padding:6px 10px; border:none; border-radius:6px;
+              background:#444; color:#ccc; cursor:pointer; font-size:12px; margin-left:8px;">Unassign</button>
+          </form>
         </td>
       </tr>
       {% else %}

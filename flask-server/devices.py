@@ -19,7 +19,11 @@ MASTER_SECRET = "Tech11-Master-Secret-ChangeThisBeforeProduction-2026"
 
 DISCOVERY_MESSAGE = b"TECH11_DISCOVER"
 DISCOVERY_PORT = 4210
-DISCOVERY_TIMEOUT_SEC = 3
+DISCOVERY_TIMEOUT_SEC = 5
+DISCOVERY_BROADCAST_ROUNDS = 3  # resend the broadcast a few times - UDP broadcast has
+                                 # no delivery guarantee, and a single lost packet means
+                                 # that device never even hears the request at all
+DISCOVERY_ROUND_INTERVAL_SEC = 1
 REQUEST_TIMEOUT_SEC = 2
 
 
@@ -64,23 +68,36 @@ def _get_broadcast_addresses():
 
 def discover_devices(timeout=DISCOVERY_TIMEOUT_SEC):
     """Broadcasts a UDP discovery request on every active interface's subnet
-    and collects replies. Returns a list of {"name", "ip", "mac"} dicts for
+    (several times, since UDP broadcast has no delivery guarantee) and
+    collects replies. Returns a list of {"name", "ip", "mac"} dicts for
     every module that responded."""
     devices = []
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    sock.settimeout(timeout)
+    sock.settimeout(0.5)  # short per-recv timeout so we can interleave re-broadcasts
 
-    try:
-        for broadcast_addr in _get_broadcast_addresses():
+    broadcast_addrs = _get_broadcast_addresses()
+    seen_macs = set()
+
+    def _send_round():
+        for broadcast_addr in broadcast_addrs:
             try:
                 sock.sendto(DISCOVERY_MESSAGE, (broadcast_addr, DISCOVERY_PORT))
             except OSError:
                 continue  # e.g. a stale/invalid broadcast address - skip it
 
-        seen_macs = set()
+    try:
+        _send_round()
         start = time.time()
+        next_round_at = start + DISCOVERY_ROUND_INTERVAL_SEC
+        rounds_sent = 1
+
         while time.time() - start < timeout:
+            if rounds_sent < DISCOVERY_BROADCAST_ROUNDS and time.time() >= next_round_at:
+                _send_round()
+                rounds_sent += 1
+                next_round_at = time.time() + DISCOVERY_ROUND_INTERVAL_SEC
+
             try:
                 data, addr = sock.recvfrom(1024)
                 parsed = json.loads(data.decode("utf-8"))
@@ -89,7 +106,7 @@ def discover_devices(timeout=DISCOVERY_TIMEOUT_SEC):
                     seen_macs.add(mac)
                     devices.append(parsed)
             except socket.timeout:
-                break
+                continue  # just means no packet arrived in this 0.5s slice - keep looping
             except (json.JSONDecodeError, UnicodeDecodeError):
                 continue
     finally:
