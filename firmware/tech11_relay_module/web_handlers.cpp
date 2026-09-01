@@ -585,7 +585,11 @@ static void handleStatus() {
 static void handleStatusBoards() {
   if (!checkApiKey()) return;
 
-  scanMCPBoards(); // re-check live status rather than relying on boot-time state
+  // Reports the CACHED state from the last scan (boot, or an explicit
+  // rescan via /diag/rescan-boards) - does NOT re-scan on every call.
+  // Re-scanning here used to happen automatically on every single poll,
+  // which meant frequent polling (e.g. the website's Test Buttons page)
+  // could keep the I2C bus busy/blocking often enough to disrupt WiFi.
 
   StaticJsonDocument<512> doc;
   doc["numRelaysUsed"] = NUM_RELAYS;
@@ -625,6 +629,17 @@ static void handleStatusExternal() {
   String output;
   serializeJson(doc, output);
   server.send(200, "application/json", output);
+}
+
+// Explicitly triggers a fresh MCP23017 board scan - this is the ONLY way
+// boards get re-scanned after boot now (see handleStatusBoards() above,
+// which just reports the cached result). Admin-triggered only, not
+// something polled/machine-driven, since I2C scanning briefly blocks and
+// shouldn't happen on every status check.
+static void handleRescanBoards() {
+  if (!checkApiKey()) return;
+  scanMCPBoards();
+  server.send(200, "text/plain", "Rescan complete");
 }
 
 static void handleRebootCommand() {
@@ -694,6 +709,7 @@ void registerWebHandlers() {
   server.on("/diag/test/stop", HTTP_POST, handleTestStop);
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/status/boards", HTTP_GET, handleStatusBoards);
+  server.on("/diag/rescan-boards", HTTP_POST, handleRescanBoards);
   server.on("/status/external", HTTP_GET, handleStatusExternal);
   server.on("/reboot", HTTP_POST, handleRebootCommand);
   server.on("/network/api-save", HTTP_POST, handleApiNetworkSave);
