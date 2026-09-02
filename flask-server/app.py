@@ -22,6 +22,7 @@ Local Users and Groups) to add/remove/change passwords for admin accounts.
 """
 
 import os
+import ipaddress
 import threading
 import time
 import subprocess
@@ -97,12 +98,20 @@ def logout():
 
 import building_store as bstore
 import devices as devsvc
+import ip_acl_store as ipacl
 import device_config_store as devcfg
 import nxwitness_config as nxcfg
 import pending_changes_store as pending
 
 REQUEST_TIMEOUT_SEC = 3
 HOLD_MS = 5000  # fixed 5 second hold for all floor buttons
+
+
+@app.before_request
+def enforce_ip_allowlist():
+    client_ip = request.remote_addr
+    if not ipacl.is_allowed(client_ip):
+        return "Access denied.", 403
 
 
 def send_relay_command(device_ip, device_mac, relay_num, duration_ms):
@@ -527,6 +536,56 @@ def admin_unassign_device(building_id, elevator_number):
     else:
         flash("Could not find that elevator to unassign.")
     return redirect(url_for("devices_page"))
+
+
+@app.route("/admin/ip-acl", methods=["GET", "POST"])
+@admin_required
+def admin_ip_acl():
+    if request.method == "POST":
+        action = request.form.get("action")
+
+        if action == "add":
+            new_entry = request.form.get("entry", "").strip()
+            if new_entry:
+                # Validate before saving - reject anything that wouldn't
+                # actually parse as an IP or CIDR range, rather than
+                # silently storing a typo that then blocks everyone.
+                try:
+                    if "/" in new_entry:
+                        ipaddress.ip_network(new_entry, strict=False)
+                    else:
+                        ipaddress.ip_address(new_entry)
+                except ValueError:
+                    flash(f"'{new_entry}' isn't a valid IP address or CIDR range - not added.")
+                    return redirect(url_for("admin_ip_acl"))
+
+                ipacl.add_entry(new_entry)
+
+                # Safety check: warn (don't block) if the list is about to
+                # start enforcing and the person's OWN current IP isn't on
+                # it - a self-lockout risk, but 127.0.0.1 stays available
+                # as a recovery path regardless, so this is a warning, not
+                # a hard stop.
+                current_ip = request.remote_addr
+                if not ipacl.is_allowed(current_ip):
+                    flash(f"Added {new_entry}. Warning: your current IP ({current_ip}) is NOT "
+                          f"on the list - you'll be blocked from the website (except via "
+                          f"localhost/RDP) after this. Add your own IP too if that's not intended.")
+                else:
+                    flash(f"Added {new_entry} to the allowlist.")
+            return redirect(url_for("admin_ip_acl"))
+
+        elif action == "remove":
+            entry = request.form.get("entry", "").strip()
+            ipacl.remove_entry(entry)
+            flash(f"Removed {entry} from the allowlist.")
+            return redirect(url_for("admin_ip_acl"))
+
+    entries = ipacl.load_acl()
+    return render_template(
+        "admin_ip_acl.html", active_page="ip_acl",
+        entries=entries, current_ip=request.remote_addr,
+    )
 
 
 @app.route("/admin/nxwitness-settings", methods=["GET", "POST"])
