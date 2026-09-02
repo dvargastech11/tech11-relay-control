@@ -95,7 +95,7 @@ Write-Host "is set to version $Esp32CoreVersion, NOT an alpha/pre-release versio
 # ============================================================
 Write-Step "Installing required libraries"
 
-arduino-cli lib install "ArduinoJson" "Adafruit SSD1306" "Adafruit GFX Library"
+arduino-cli lib install "ArduinoJson" "Adafruit SH110X" "Adafruit GFX Library"
 
 # ============================================================
 # 5. Clone or update the firmware repo

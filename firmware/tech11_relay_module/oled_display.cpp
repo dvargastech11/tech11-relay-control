@@ -3,24 +3,20 @@
 #include "network_config.h"
 #include <Wire.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Adafruit_SH110X.h>
 #include <time.h>
 
 /*
   OLED status display - GME12864-11 module (128x64, I2C).
 
-  DRIVER CHIP UNCERTAINTY: this module number is sold with either an
-  SSD1306 or SH1106 driver depending on manufacturer/batch - we don't have
-  a confirmed datasheet for this specific unit, so this defaults to
-  SSD1306 (the more common variant at this size/interface). VERIFY with
-  the I2C scanner (firmware/i2c_scanner) - should show up at 0x3C either
-  way, that doesn't tell driver chip apart. The real tell: if the display
-  shows garbled pixels, a shifted image, or content cut off on one edge,
-  that's the classic symptom of an SH1106 panel being driven with SSD1306
-  init/addressing (SH1106 has a 132-pixel-wide internal buffer vs
-  SSD1306's exact 128, offsetting everything a few pixels). If that
-  happens, swap the Adafruit_SSD1306 library/includes below for
-  Adafruit_SH110X and re-test.
+  DRIVER: SH1106 (via Adafruit_SH110X library). This module was
+  originally tried as SSD1306 (a common default assumption for
+  128x64 I2C OLEDs), but on real hardware display.begin() succeeded
+  (ACK'd on the bus, accepted the init sequence) while the screen stayed
+  completely blank - the classic symptom of an SH1106 panel being driven
+  with SSD1306 commands (SH1106 has a 132-pixel-wide internal buffer vs
+  SSD1306's exact 128, and different display-on/addressing registers, so
+  it can accept generic init commands without truly turning on).
 
   5 lines total:
     Line 1: header (device name)
@@ -35,7 +31,7 @@
 
 #define RECENT_CALLS_SHOWN 4
 
-static Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
+static Adafruit_SH1106G display(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
 static bool displayAvailable = false;
 
 struct RecentCall {
@@ -64,16 +60,18 @@ void setupOledDisplay() {
   // treat that as "no display installed" rather than a hard failure, since
   // this is an optional accessory, not required for the elevator control
   // system to function.
-  displayAvailable = display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDRESS);
+  displayAvailable = display.begin(OLED_I2C_ADDRESS, true);
 
   if (!displayAvailable) {
     Serial.println("[OLED] Not detected at 0x3C - continuing without display");
     return;
   }
 
+  Serial.println("[OLED] Detected and initialized at 0x3C");
+
   display.clearDisplay();
   display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
+  display.setTextColor(SH110X_WHITE);
   display.setCursor(0, 0);
   display.println("Starting up...");
   display.display();
