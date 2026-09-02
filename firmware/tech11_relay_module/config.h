@@ -15,7 +15,7 @@
 #define MASTER_SECRET "Tech11-Master-Secret-ChangeThisBeforeProduction-2026"
 
 // GitHub OTA source (public repo raw content URLs)
-#define CURRENT_FIRMWARE_VERSION "1.0.1"
+#define CURRENT_FIRMWARE_VERSION "1.0.2"
 #define GITHUB_VERSION_URL  "https://raw.githubusercontent.com/dvargastech11/tech11-relay-control/main/firmware/version.txt"
 #define GITHUB_FIRMWARE_URL "https://raw.githubusercontent.com/dvargastech11/tech11-relay-control/main/firmware/firmware.bin"
 
