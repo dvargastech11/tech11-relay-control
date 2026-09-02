@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
     Compiles the Tech 11 relay module firmware once, then flashes it to
-    an unlimited number of ESP32 devices, one at a time, using the SAME
-    COM port for every device (asked once up front) - for the common
-    workflow of swapping boards in/out of the same USB connector rather
-    than plugging into different physical ports each time.
+    an unlimited number of ESP32 devices, one at a time - identifying the
+    ESP32's COM port automatically by its actual USB device identity
+    (CP210x or CH340 USB-to-serial chip, the two used on ESP32 dev
+    boards), not just by watching for any new port to appear.
 
 .DESCRIPTION
     Every USB flash does a FULL FLASH ERASE first (EraseFlash=all), wiping
@@ -26,6 +26,27 @@ $BuildDir    = ".\build_output"
 $CompileFqbn = "esp32:esp32:esp32:PartitionScheme=min_spiffs"
 $UploadFqbn  = "esp32:esp32:esp32:PartitionScheme=min_spiffs,EraseFlash=all"
 
+# Known ESP32 dev board USB-to-serial chip identifiers - matched against
+# each COM port's PnP device description.
+$EspChipPatterns = @("CP210", "Silicon Labs", "CH340", "CH341", "USB-SERIAL", "USB-Enhanced-SERIAL")
+
+function Find-EspPorts {
+    $results = @()
+    $pnpDevices = Get-CimInstance -ClassName Win32_PnPEntity -ErrorAction SilentlyContinue
+    foreach ($device in $pnpDevices) {
+        if ($device.Name -match "\((COM\d+)\)") {
+            $comPort = $Matches[1]
+            foreach ($pattern in $EspChipPatterns) {
+                if ($device.Name -like "*$pattern*") {
+                    $results += [PSCustomObject]@{ Port = $comPort; Description = $device.Name }
+                    break
+                }
+            }
+        }
+    }
+    return $results
+}
+
 Write-Host "`n=== Compiling firmware (once) ===" -ForegroundColor Cyan
 arduino-cli compile --fqbn $CompileFqbn --output-dir $BuildDir $SketchDir
 
@@ -35,8 +56,23 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "`nCompiled successfully." -ForegroundColor Green
+Write-Host "`nLooking for an ESP32 (CP210x/CH340 USB-serial chip)..." -ForegroundColor Yellow
 
-$port = Read-Host "`nEnter the COM port to use for all devices (e.g. COM6)"
+$found = Find-EspPorts
+$port = $null
+
+if ($found.Count -eq 1) {
+    $port = $found[0].Port
+    Write-Host "Found: $($found[0].Description)" -ForegroundColor Green
+} elseif ($found.Count -gt 1) {
+    Write-Host "Multiple matching devices found:" -ForegroundColor Yellow
+    $found | ForEach-Object { Write-Host "  $($_.Port): $($_.Description)" }
+    $port = Read-Host "Type which port to use"
+} else {
+    Write-Host "No ESP32-like device detected automatically." -ForegroundColor Yellow
+    $port = Read-Host "Enter the COM port manually (e.g. COM6)"
+}
+
 if ([string]::IsNullOrWhiteSpace($port)) {
     Write-Host "No port given - aborting." -ForegroundColor Red
     exit 1
