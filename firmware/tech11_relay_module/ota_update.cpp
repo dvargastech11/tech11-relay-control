@@ -50,6 +50,41 @@ void performGitHubUpdate() {
   }
 }
 
+// Compares two "main.overhaul.small" version strings part by part as
+// integers. Returns true if `a` is newer than `b`.
+// NOTE: a naive toFloat() comparison doesn't work here - "1.0.1".toFloat()
+// and "1.0.0".toFloat() BOTH parse to 1.0 (the float parser stops at the
+// second decimal point), so that comparison could never detect an update
+// beyond the first two version parts. This was a real bug - fixed here by
+// actually parsing and comparing each of the three parts as integers.
+bool isNewerVersion(String a, String b) {
+  int aParts[3] = {0, 0, 0};
+  int bParts[3] = {0, 0, 0};
+
+  int idx = 0;
+  int start = 0;
+  for (int i = 0; i <= a.length() && idx < 3; i++) {
+    if (i == a.length() || a.charAt(i) == '.') {
+      aParts[idx++] = a.substring(start, i).toInt();
+      start = i + 1;
+    }
+  }
+
+  idx = 0;
+  start = 0;
+  for (int i = 0; i <= b.length() && idx < 3; i++) {
+    if (i == b.length() || b.charAt(i) == '.') {
+      bParts[idx++] = b.substring(start, i).toInt();
+      start = i + 1;
+    }
+  }
+
+  for (int i = 0; i < 3; i++) {
+    if (aParts[i] != bParts[i]) return aParts[i] > bParts[i];
+  }
+  return false; // identical
+}
+
 void checkForUpdates(bool forceApply) {
   String remoteVersion = fetchRemoteVersion();
 
@@ -58,7 +93,7 @@ void checkForUpdates(bool forceApply) {
     return;
   }
 
-  if (remoteVersion.toFloat() > String(CURRENT_FIRMWARE_VERSION).toFloat()) {
+  if (isNewerVersion(remoteVersion, String(CURRENT_FIRMWARE_VERSION))) {
     lastUpdateCheckResult = "New version available: " + remoteVersion +
                              " (current: " + String(CURRENT_FIRMWARE_VERSION) + ")";
     if (forceApply) performGitHubUpdate();
