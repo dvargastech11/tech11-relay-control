@@ -1,6 +1,7 @@
 #include "relay_control.h"
 #include "config.h"
 #include "activity_log.h"
+#include "oled_display.h"
 #include <Wire.h>
 
 /*
@@ -180,6 +181,7 @@ void activateRelay(int relayNum, int durationMs) {
   // Production path - capped at NUM_RELAYS (47), the actual floors in use.
   if (relayNum < 1 || relayNum > NUM_RELAYS) return;
   activateChannelInternal(relayNum, durationMs);
+  logFloorRequest(relayNum); // OLED display - real requests only, not diagnostic triggers
 }
 
 void activateChannelDiag(int channel1to48, int durationMs) {
