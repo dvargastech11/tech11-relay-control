@@ -36,7 +36,11 @@ static void handleRoot() {
   html += "<h2>" + deviceName + "</h2>";
 
   html += "<h3>Relay Test (48 channels, 3 boards)</h3>";
-  scanMCPBoards(); // re-check board presence each time this page loads
+  html += "<button onclick=\"rescanBoards()\" style='margin-bottom:10px;'>Rescan Boards</button>";
+  html += "<span id='rescanStatus' style='color:#aaa; font-size:13px; margin-left:8px;'></span>";
+  // Board status shown below is from the LAST scan (boot, or the button
+  // above) - not automatically re-checked on every page load, since that
+  // was blocking the loop often enough to disrupt WiFi.
   for (int b = 0; b < NUM_MCP_BOARDS; b++) {
     bool online = isBoardOnline(b);
     html += "<div style='margin-bottom:14px;'>";
@@ -109,6 +113,11 @@ static void handleRoot() {
   html += "<div id='updateStatus' style='color:#aaa;margin-top:8px;'></div>";
 
   html += "<script>";
+  html += "async function rescanBoards(){document.getElementById('rescanStatus').innerText='Scanning...';"
+          "try{await fetch('/diag/rescan-boards',{method:'POST'});"
+          "document.getElementById('rescanStatus').innerText='Done - reloading...';"
+          "setTimeout(()=>location.reload(),500);"
+          "}catch(e){document.getElementById('rescanStatus').innerText='Error: '+e;}}";
   html += "async function trigDiag(n){document.getElementById('status').innerText='Sending channel '+n+'...';"
           "try{const r=await fetch('/diag/trigger?channel='+n+'&duration=5000',{method:'POST'});"
           "document.getElementById('status').innerText=await r.text();}catch(e){document.getElementById('status').innerText='Error: '+e;}}";
@@ -637,7 +646,7 @@ static void handleStatusExternal() {
 // something polled/machine-driven, since I2C scanning briefly blocks and
 // shouldn't happen on every status check.
 static void handleRescanBoards() {
-  if (!checkApiKey()) return;
+  if (!checkAuth()) return;
   scanMCPBoards();
   server.send(200, "text/plain", "Rescan complete");
 }

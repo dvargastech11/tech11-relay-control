@@ -16,7 +16,13 @@ String getTimestamp() {
 }
 
 void addLog(String direction, String message) {
-  activityLog[logWriteIndex] = { getTimestamp(), direction, message };
+  String timestamp = getTimestamp();
+  activityLog[logWriteIndex] = { timestamp, direction, message };
   logWriteIndex = (logWriteIndex + 1) % LOG_SIZE;
   if (logCount < LOG_SIZE) logCount++;
+
+  // Also print live to Serial - so relay activity (and everything else
+  // that goes through this same function) is visible in real time over
+  // USB, not just after the fact via the /logs web page.
+  Serial.println("[" + timestamp + "] " + direction + ": " + message);
 }
