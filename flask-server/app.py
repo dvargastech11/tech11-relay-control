@@ -205,9 +205,10 @@ def activate(building_id, elevator_number, floor_number, duration_ms):
         return jsonify({"success": False, "error": "Duration must be greater than 0"}), 400
 
     # Relay number on the physical module = position of this floor in the
-    # elevator's floor list (1-indexed) - matches how the module's MCP23017
-    # channels are wired up in sequence.
-    relay_num = elevator["floors"].index(floor) + 1
+    # elevator's floor list, offset by 2 (not 1) - relay 1 is permanently
+    # reserved as SWITCH (not tied to any floor, for future use), so the
+    # first floor in the list gets relay 2, the second gets relay 3, etc.
+    relay_num = elevator["floors"].index(floor) + 2
 
     success, message = send_relay_command(elevator["device_ip"], elevator.get("device_mac"), relay_num, duration_ms)
     return jsonify({"success": success, "message": message})
@@ -253,16 +254,30 @@ def admin_test_buttons():
 
                 relay_grid = []
                 for relay_num in range(1, hardware_channels + 1):
-                    is_floor_configured = relay_num <= len(floors)
-                    # If we don't have board info (older firmware/unreachable),
-                    # don't block on it - assume available rather than greying
-                    # out everything.
                     is_board_online = board_online_by_channel.get(relay_num, True)
+
+                    if relay_num == 1:
+                        # Reserved as SWITCH - not tied to any floor, held
+                        # for future use.
+                        relay_grid.append({
+                            "relay_num": relay_num,
+                            "configured": False,
+                            "is_switch": True,
+                            "board_online": is_board_online,
+                            "label": "SWITCH",
+                        })
+                        continue
+
+                    # Relay 2 = floors[0], relay 3 = floors[1], etc. - relay
+                    # 1 being reserved shifts every floor's relay by one.
+                    floor_index = relay_num - 2
+                    is_floor_configured = 0 <= floor_index < len(floors)
                     relay_grid.append({
                         "relay_num": relay_num,
                         "configured": is_floor_configured,
+                        "is_switch": False,
                         "board_online": is_board_online,
-                        "label": floors[relay_num - 1]["label"] if is_floor_configured else None,
+                        "label": floors[floor_index]["label"] if is_floor_configured else None,
                     })
 
                 devices_list.append({
