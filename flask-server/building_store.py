@@ -181,10 +181,14 @@ def ordinal_label(n):
 
 
 def configure_elevator_floors(data, building_id, elevator_number, num_floors, skip_13th):
-    """(Re)generates the floor list 2..num_floors+1 (skipping 13th if set).
-    Existing per-floor customizations (enabled/schedule) are preserved for
-    floor numbers that still exist after reconfiguration; new floors get
-    defaults, removed floors are dropped."""
+    """(Re)generates the floor list Lobby, 2..num_floors+1 (skipping 13th if
+    set). Lobby is always the first entry (floor number 1, maps to relay 1)
+    - a fixed placeholder present on every elevator, not counted toward
+    num_floors, kept for completeness even though it's not expected to be
+    actively used day-to-day. Existing per-floor customizations
+    (enabled/schedule) are preserved for floor numbers that still exist
+    after reconfiguration; new floors get defaults, removed floors are
+    dropped."""
     building = get_building(data, building_id)
     if not building:
         return None
@@ -206,6 +210,11 @@ def configure_elevator_floors(data, building_id, elevator_number, num_floors, sk
         count += 1
 
     new_floors = []
+    if 1 in existing_by_number:
+        new_floors.append(existing_by_number[1])
+    else:
+        new_floors.append(_make_floor(1, label="Lobby"))
+
     for n in new_floor_numbers:
         if n in existing_by_number:
             new_floors.append(existing_by_number[n])
