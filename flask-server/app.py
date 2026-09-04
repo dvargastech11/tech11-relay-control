@@ -205,11 +205,15 @@ def activate(building_id, elevator_number, floor_number, duration_ms):
         return jsonify({"success": False, "error": "Duration must be greater than 0"}), 400
 
     # Relay number = position of this floor in the elevator's floor list,
-    # offset by 2 (relay 1 is reserved as SWITCH). Floor LABELS and relay
-    # NUMBERS are fully independent - if "13th floor" is skipped as a
-    # label, that does NOT skip a relay too. The floor immediately after
-    # (e.g. "14th floor") simply gets the next relay in sequence.
-    relay_num = elevator["floors"].index(floor) + 2
+    # offset by 2 - EXCEPT the last (highest) floor in the list, which is
+    # deliberately placed on relay 1 instead, to match existing physical
+    # wiring and save a rewire. No more reserved SWITCH slot - relay 1 is
+    # a real floor now.
+    floors_list = elevator["floors"]
+    if floors_list and floor is floors_list[-1]:
+        relay_num = 1
+    else:
+        relay_num = floors_list.index(floor) + 2
 
     success, message = send_relay_command(elevator["device_ip"], elevator.get("device_mac"), relay_num, duration_ms)
     return jsonify({"success": success, "message": message})
@@ -253,27 +257,29 @@ def admin_test_buttons():
                     for ch in range(b.get("channelStart", 1), b.get("channelEnd", 16) + 1):
                         board_online_by_channel[ch] = online
 
-                # Index floors by their own stored number for quick lookup -
                 relay_grid = []
                 for relay_num in range(1, hardware_channels + 1):
                     is_board_online = board_online_by_channel.get(relay_num, True)
 
                     if relay_num == 1:
-                        # Reserved as SWITCH - not tied to any floor, held
-                        # for future use.
+                        # The last (highest) floor in the list lives here now,
+                        # not a reserved SWITCH slot - saves a rewire to match
+                        # existing physical wiring.
+                        top_floor = floors[-1] if floors else None
                         relay_grid.append({
                             "relay_num": relay_num,
-                            "configured": False,
-                            "is_switch": True,
+                            "configured": top_floor is not None,
+                            "is_switch": False,
                             "board_online": is_board_online,
-                            "label": "SWITCH",
+                            "label": top_floor["label"] if top_floor else None,
                         })
                         continue
 
-                    # Relay 2 = floors[0], relay 3 = floors[1], etc. - purely
-                    # positional, independent of each floor's own label/number.
+                    # Relay 2 = floors[0], relay 3 = floors[1], etc. - but
+                    # only up to the SECOND-TO-LAST floor, since the last
+                    # one already moved to relay 1 above.
                     floor_index = relay_num - 2
-                    is_floor_configured = 0 <= floor_index < len(floors)
+                    is_floor_configured = 0 <= floor_index < len(floors) - 1
                     relay_grid.append({
                         "relay_num": relay_num,
                         "configured": is_floor_configured,
