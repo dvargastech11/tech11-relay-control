@@ -204,11 +204,14 @@ def activate(building_id, elevator_number, floor_number, duration_ms):
     if duration_ms <= 0:
         return jsonify({"success": False, "error": "Duration must be greater than 0"}), 400
 
-    # Relay number on the physical module = position of this floor in the
-    # elevator's floor list, offset by 2 (not 1) - relay 1 is permanently
-    # reserved as SWITCH (not tied to any floor, for future use), so the
-    # first floor in the list gets relay 2, the second gets relay 3, etc.
-    relay_num = elevator["floors"].index(floor) + 2
+    # Relay number = this floor's own stored number, directly. Floor
+    # numbering already starts at 2 (relay 1 is reserved as SWITCH) and
+    # already skips 13 in the underlying data when skip_13th is set (see
+    # configure_elevator_floors()) - using the floor's actual number here
+    # (not its position in the list) means relay 13 stays genuinely
+    # unused when 13 is skipped, instead of the next floor silently
+    # absorbing that slot.
+    relay_num = floor["number"]
 
     success, message = send_relay_command(elevator["device_ip"], elevator.get("device_mac"), relay_num, duration_ms)
     return jsonify({"success": success, "message": message})
@@ -252,6 +255,13 @@ def admin_test_buttons():
                     for ch in range(b.get("channelStart", 1), b.get("channelEnd", 16) + 1):
                         board_online_by_channel[ch] = online
 
+                # Index floors by their own stored number for quick lookup -
+                # matches how relay_num is now assigned (floor's actual
+                # number, not its position in the list), so a skipped floor
+                # number (e.g. 13) correctly shows as unconfigured instead
+                # of the next floor's data silently shifting into its slot.
+                floors_by_number = {f["number"]: f for f in floors}
+
                 relay_grid = []
                 for relay_num in range(1, hardware_channels + 1):
                     is_board_online = board_online_by_channel.get(relay_num, True)
@@ -268,16 +278,13 @@ def admin_test_buttons():
                         })
                         continue
 
-                    # Relay 2 = floors[0], relay 3 = floors[1], etc. - relay
-                    # 1 being reserved shifts every floor's relay by one.
-                    floor_index = relay_num - 2
-                    is_floor_configured = 0 <= floor_index < len(floors)
+                    matching_floor = floors_by_number.get(relay_num)
                     relay_grid.append({
                         "relay_num": relay_num,
-                        "configured": is_floor_configured,
+                        "configured": matching_floor is not None,
                         "is_switch": False,
                         "board_online": is_board_online,
-                        "label": floors[floor_index]["label"] if is_floor_configured else None,
+                        "label": matching_floor["label"] if matching_floor else None,
                     })
 
                 devices_list.append({
