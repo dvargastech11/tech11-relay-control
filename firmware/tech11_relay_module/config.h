@@ -66,7 +66,7 @@
 // Relays - PRODUCTION config: 47 channels across 3x MCP23017 I2C expanders
 // (16 channels each, 48 available, 47 used - matches one elevator's floor
 // count). Replaces the earlier 2-relay direct-GPIO test config.
-#define NUM_RELAYS 47
+#define NUM_RELAYS 48  // Lobby (always present) + up to 47 numbered floors = 48 total - no spare channel left in a fully-configured elevator
 #define RELAY_ACTIVE_LEVEL LOW    // ACEIRMC 16-channel relay board is low-level trigger
 #define RELAY_INACTIVE_LEVEL HIGH
 
