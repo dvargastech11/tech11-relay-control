@@ -65,13 +65,13 @@ These orders don't appear in the invoice-tracked table above (invoices covering 
 | 113-3320578-3181863 | JST XH mini/micro 6-pin pre-wired connector pairs, 26AWG 150mm, 20 pairs | 20 pairs | — | — | Received (Aug 29) |
 | 114-9236577-1050667 | ELEGOO PETG 3D Printer Filament, 1.75mm, 1kg | 1 spool | — | $14.97 (order total) | Received (Aug 31) — **project relevance unconfirmed**, see note below |
 
-**Additional received (before tax, confident project spend): $257.11**
+**Additional received (before tax, confident project spend): $272.08** ($257.11 + $14.97 ELEGOO filament, now confirmed project-related)
 **Additional in transit: $39.81**
-**Updated received to date: $919.19** ($662.08 + $257.11)
+**Updated received to date: $934.16** ($662.08 + $272.08)
 **Updated still in transit: $473.81** ($434.00 + $39.81)
-**Updated combined project spend (excluding refund, mixed order, and unconfirmed filament): ~$1,393.00**
+**Updated combined project spend (excluding refund and the still-unsplit mixed order): ~$1,407.97**
 
-_Not included in the totals above: the $40.83 mixed order (partial project relevance, can't be split without a line-item invoice) and the $14.97 ELEGOO filament (project relevance unconfirmed). If both turn out to be fully project-related, add $55.80 to reach ~$1,448.80._
+_Not included in the total above: the $40.83 mixed order (partial project relevance — the connector housing is project-related, the Milwaukee battery and Hakko filter aren't — can't be split without a line-item invoice). If fully project-related, add up to $40.83 to reach ~$1,448.80._
 
 _Also excluded entirely (non-project, found in the same Amazon order history but unrelated to this build): Milwaukee tool battery + Hakko desoldering filter (bundled in the $40.83 mixed order above), XMTYAN earbud tips ($10.57, order 113-6427869-7712206), Sticky Tack poster stickers + 2x Hatsune Miku wall posters ($29.93, order 114-2350662-1472206), Kasa Matter Smart Light Switch KS205P3 x2 ($106.98, order 114-3957491-6351425), Helping Hands soldering clamp stand ($27.81, order 114-0428163-6706655). Also seen but cancelled/not charged: two M2 screw-kit orders, a 500pc low-voltage wire connector order, and a Loctite super glue order._
 
@@ -114,7 +114,7 @@ _Also excluded entirely (non-project, found in the same Amazon order history but
 | Taiss 2.54mm JST-XH connector kit (2/3/4/5/6-pin, 560pcs) | 1 kit | |
 | JST XH 6-pin pre-wired connector pairs, 26AWG 150mm | 60 pairs | |
 | JST XH mini/micro 6-pin pre-wired connector pairs, 26AWG 150mm | 20 pairs | |
-| 3.3V buck converter module (Mini360-style, 5-30V in), 5-pack | 3 packs (15pcs) | **Purpose still unconfirmed** — flagging so it can be tied to a specific rail (LAN8720 3.3V supply? sensor logic?) rather than guessed |
+| 3.3V buck converter module (Mini360-style, 5-30V in), 5-pack | 3 packs (15pcs) | Steps the 5V rail down to 3.3V to feed the ESP32 modules |
 
 *The JST-XH / right-angle connector purchases look like they're for building removable wiring harnesses between the MCP23017 boards, relay boards, and room power buses — worth confirming so these can be folded into a proper per-elevator harness line instead of sitting as loose consumables.*
 
@@ -127,11 +127,11 @@ _Also excluded entirely (non-project, found in the same Amazon order history but
 | M2 x 4mm SS button-head screws (100pcs) | 1 pack | |
 | MCMASKE M2 button-head screw/nut/washer kit | 1 kit | |
 
-## Possibly Project-Related — Unconfirmed
+## 3D-Printed Parts
 
 | Item | Ordered/Received | Note |
 |---|---|---|
-| ELEGOO PETG 3D printer filament, 1.75mm, 1kg | 1 spool | Could be for 3D-printed brackets/enclosures on this project, or unrelated — flagging rather than assuming |
+| ELEGOO Rapid PETG filament, 1.75mm, 1kg | 1 spool | Used to print mounting brackets and other misc. parts for the build. Print files (STL/etc.) to be added to this repo separately. |
 
 ## Open Items Before Full-Scale Ordering
 
@@ -139,6 +139,7 @@ _Also excluded entirely (non-project, found in the same Amazon order history but
 - Verify MCP23017 boards' onboard I2C pull-ups with a multimeter once received — determines whether the 100-pack of 4.7kΩ resistors on hand is actually needed.
 - Confirm intended use of the IDC connector 50-pack, IDC ribbon cable, and DIN rail (all added in Order 2) so they can be properly categorized above.
 - All core per-elevator electronics (ESP32, breakout board, Ethernet, MCP23017, relay boards) are now fully covered for all 12 elevators — next phase is assembly/wiring, not further ordering, aside from IEC cords and any enclosure hardware.
-- **New this update:** confirm intended use of the 3.3V buck converters and ELEGOO PETG filament, and whether the 2.54mm 1x10P connector housing (Amazon order) duplicates the Antrader FC-10P 50-pack already on hand — three open questions before these get folded cleanly into the sections above.
-- The mixed $40.83 order and the $14.97 filament order are excluded from the running project-spend total pending confirmation — see notes above.
+- Confirm whether the 2.54mm 1x10P connector housing (Amazon order) duplicates the Antrader FC-10P 50-pack already on hand — still open.
+- The mixed $40.83 order is excluded from the running project-spend total pending a line-item invoice — see note above.
+- 3D-printed bracket/enclosure files (STL/etc.) are expected to be added to this repo separately — no dedicated directory for them yet.
 
