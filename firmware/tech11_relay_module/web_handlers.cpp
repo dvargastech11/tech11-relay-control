@@ -463,8 +463,8 @@ static void handleTrigger() {
 }
 
 // Diagnostic-only channel test - human admin login (not API key), allows
-// testing all 48 physical channels including the spare one beyond
-// NUM_RELAYS. Used by the management page's per-board test grid.
+// testing all 48 physical channels. Used by the management page's
+// per-board test grid.
 static void handleDiagTrigger() {
   if (!checkAuth()) return;
 

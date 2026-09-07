@@ -4,10 +4,11 @@
 #include <Wire.h>
 
 /*
-  Production relay driving: up to 48 channels across 3x MCP23017 I2C
-  expanders (16 each). 47 are actually wired to floor buttons (NUM_RELAYS);
-  channel 48 is spare hardware capacity, still testable via the diagnostic
-  page but never reachable through the production /trigger endpoint.
+  Production relay driving: 48 channels across 3x MCP23017 I2C
+  expanders (16 each), all reachable through the production /trigger
+  endpoint (NUM_RELAYS=48) - Lobby always occupies channel 1, leaving up
+  to 47 numbered floors across the rest. No spare channel remains in a
+  fully-configured elevator.
   ---------------------------------------------------------------------------
   BOARD ADDRESSING IS AUTO-DISCOVERED, not hardcoded. On boot,
   scanMCPBoards() probes every valid MCP23017 address (0x20-0x27, the full
@@ -183,8 +184,9 @@ void activateRelay(int relayNum, int durationMs) {
 }
 
 void activateChannelDiag(int channel1to48, int durationMs) {
-  // Diagnostic path - allows testing the full 48-channel hardware capacity,
-  // including the one spare channel not mapped to any floor.
+  // Diagnostic path - identical range to production now (NUM_RELAYS=48),
+  // kept as a separate function so diagnostic triggers stay distinct from
+  // real floor-call activity in the logs.
   activateChannelInternal(channel1to48, durationMs);
 }
 

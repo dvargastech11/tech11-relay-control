@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}IP Allowlist{% endblock %}
+{% block content %}
+  <h1>IP Allowlist</h1>
+  <p style="color:#888; max-width:500px; margin:0 auto 10px;">
+    Restrict which client IPs can connect to this website at all. An empty list means
+    <strong style="color:#eee;">unrestricted</strong> (everyone allowed) - enforcement only begins
+    once you add at least one entry. <code>127.0.0.1</code> (localhost) is always allowed, regardless
+    of this list, as a recovery path if you ever lock yourself out remotely.
+  </p>
+  <p style="color:#666; font-size:13px; max-width:500px; margin:0 auto 20px;">
+    Your current connection is from: <strong style="color:#eee;">{{ current_ip }}</strong>
+  </p>
+
+  <div style="max-width:500px; margin:0 auto 20px;">
+    <table style="width:100%; border-collapse:collapse;">
+      <tr style="color:#aaa; text-align:left; font-size:13px;">
+        <th style="padding:8px;">Allowed IP / CIDR</th>
+        <th style="padding:8px;"></th>
+      </tr>
+      {% for entry in entries %}
+      <tr style="border-top:1px solid #333;">
+        <td style="padding:8px;">
+          {{ entry }}
+          {% if entry == current_ip %}<span style="color:#2fbf4f; font-size:11px;"> (you)</span>{% endif %}
+        </td>
+        <td style="padding:8px; text-align:right;">
+          <form method="POST" style="display:inline;" onsubmit="return confirm('Remove {{ entry }} from the allowlist?');">
+            <input type="hidden" name="action" value="remove">
+            <input type="hidden" name="entry" value="{{ entry }}">
+            <button type="submit" style="padding:4px 10px; border:none; border-radius:6px;
+              background:#7a1f1f; color:white; cursor:pointer; font-size:12px;">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="2" style="padding:12px; color:#888;">No restrictions - open to all IPs.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <form method="POST" style="max-width:500px; margin:0 auto; display:flex; gap:8px;">
+    <input type="hidden" name="action" value="add">
+    <input type="text" name="entry" placeholder="192.168.1.50 or 192.168.1.0/24" required
+      style="flex:1; padding:10px; border-radius:6px; border:1px solid #444;
+      background:#262626; color:#eee; box-sizing:border-box;">
+    <button type="submit" style="padding:10px 16px; border:none; border-radius:8px;
+      background:#2d6cdf; color:white; cursor:pointer;">Add</button>
+  </form>
+{% endblock %}
