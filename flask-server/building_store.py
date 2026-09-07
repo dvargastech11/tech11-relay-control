@@ -77,6 +77,15 @@ def get_building(data, building_id):
     return next((b for b in data["buildings"] if b["id"] == building_id), None)
 
 
+def get_building_by_name(data, name):
+    """Case-insensitive exact match on building name - for the external
+    API, where callers identify a building by name rather than internal ID."""
+    if not name:
+        return None
+    name_lower = name.strip().lower()
+    return next((b for b in data["buildings"] if b["name"].strip().lower() == name_lower), None)
+
+
 def get_elevator(building, elevator_number):
     return next((e for e in building["elevators"] if e["elevator_number"] == elevator_number), None)
 

@@ -102,6 +102,7 @@ import ip_acl_store as ipacl
 import device_config_store as devcfg
 import nxwitness_config as nxcfg
 import pending_changes_store as pending
+import external_api_config as extapi
 
 REQUEST_TIMEOUT_SEC = 3
 HOLD_MS = 5000  # fixed 5 second hold for all floor buttons
@@ -210,6 +211,63 @@ def activate(building_id, elevator_number, floor_number, duration_ms):
     relay_num = elevator["floors"].index(floor) + 1
 
     success, message = send_relay_command(elevator["device_ip"], elevator.get("device_mac"), relay_num, duration_ms)
+    return jsonify({"success": success, "message": message})
+
+
+@app.route("/api/activate", methods=["POST"])
+def api_activate_relay():
+    """External integration endpoint - lets another system trigger a
+    relay by Building name + Elevator number + Floor number, without
+    needing to know internal MAC addresses, IPs, or raw relay numbers.
+    Authenticated via a dedicated API key (X-API-Key header) - separate
+    from the human admin login, since external systems can't do a
+    browser login flow. Manage the key via /admin/external-api-settings.
+
+    Expected JSON body:
+        {"building": "South Tower", "elevator": "1", "floor": "5"}
+    """
+    api_key = request.headers.get("X-API-Key", "")
+    if not extapi.is_valid_key(api_key):
+        return jsonify({"success": False, "error": "Invalid or missing API key"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    building_name = str(payload.get("building", "")).strip()
+    elevator_num_raw = str(payload.get("elevator", "")).strip()
+    floor_num_raw = str(payload.get("floor", "")).strip()
+
+    if not building_name or not elevator_num_raw or not floor_num_raw:
+        return jsonify({"success": False, "error": "Missing required field(s): building, elevator, floor"}), 400
+
+    data = bstore.load_data()
+    building = bstore.get_building_by_name(data, building_name)
+    if not building:
+        return jsonify({"success": False, "error": f"No building found matching '{building_name}'"}), 404
+
+    # Elevator number may arrive as "01", "1", etc. - try an exact match
+    # first (in case it's stored with leading zeros too), then fall back
+    # to a leading-zero-stripped comparison.
+    elevator = bstore.get_elevator(building, elevator_num_raw)
+    if not elevator:
+        normalized = elevator_num_raw.lstrip("0") or "0"
+        elevator = next((e for e in building["elevators"]
+                          if str(e["elevator_number"]).lstrip("0") == normalized), None)
+    if not elevator:
+        return jsonify({"success": False, "error": f"No elevator '{elevator_num_raw}' found in building '{building_name}'"}), 404
+
+    try:
+        floor_number_int = int(floor_num_raw)
+    except ValueError:
+        return jsonify({"success": False, "error": f"'{floor_num_raw}' is not a valid floor number"}), 400
+
+    floor = next((f for f in elevator["floors"] if f["number"] == floor_number_int), None)
+    if not floor:
+        return jsonify({"success": False, "error": f"Floor {floor_number_int} not configured on this elevator"}), 404
+
+    if not bstore.is_floor_available_now(floor):
+        return jsonify({"success": False, "error": "This floor is not currently available"}), 403
+
+    relay_num = elevator["floors"].index(floor) + 1
+    success, message = send_relay_command(elevator["device_ip"], elevator.get("device_mac"), relay_num, HOLD_MS)
     return jsonify({"success": success, "message": message})
 
 
@@ -536,6 +594,20 @@ def admin_unassign_device(building_id, elevator_number):
     else:
         flash("Could not find that elevator to unassign.")
     return redirect(url_for("devices_page"))
+
+
+@app.route("/admin/external-api-settings", methods=["GET", "POST"])
+@admin_required
+def admin_external_api_settings():
+    if request.method == "POST":
+        new_key = extapi.generate_new_key()
+        flash("New API key generated. Update any external system using the old key - it no longer works.")
+        return redirect(url_for("admin_external_api_settings"))
+
+    return render_template(
+        "admin_external_api_settings.html", active_page="external_api",
+        api_key=extapi.get_api_key(),
+    )
 
 
 @app.route("/admin/ip-acl", methods=["GET", "POST"])
