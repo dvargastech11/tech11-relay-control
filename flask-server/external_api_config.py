@@ -13,10 +13,11 @@ import os
 import platform
 import secrets
 
-if platform.system() == "Windows":
-    DATA_DIR = r"C:\tech11-data"
-else:
-    DATA_DIR = os.path.expanduser("~/tech11-data")
+# TECH11_DATA_DIR lets a test instance point at a separate data
+# directory (isolated from production) - falls back to the normal
+# location if not set.
+_default_data_dir = r"C:\tech11-data" if platform.system() == "Windows" else os.path.expanduser("~/tech11-data")
+DATA_DIR = os.environ.get("TECH11_DATA_DIR", _default_data_dir)
 
 DATA_FILE = os.path.join(DATA_DIR, "external_api_config.json")
 

@@ -3,19 +3,26 @@ Production entrypoint - runs the Flask app under waitress instead of
 Flask's built-in development server. This is what the Windows Service
 (via NSSM) actually launches.
 
-By default binds to 0.0.0.0 (all network interfaces). To restrict the
-server to a single specific IP - e.g. so it's not reachable from every
-NIC on a multi-homed server - set the BIND_IP environment variable to
-that IP before starting the service:
+By default binds to 0.0.0.0 (all network interfaces) on port 5000. Two
+environment variables let you run a separate TEST instance alongside
+production on the same machine, fully isolated:
+
+    BIND_IP           - restrict which interface the server listens on
+    PORT              - which port to listen on (default 5000)
+    TECH11_DATA_DIR   - where persistent data lives (buildings.json, device
+                        configs, etc.) - set this to a SEPARATE directory
+                        for a test instance so it never touches production
+                        data (see building_store.py and friends)
 
     Via NSSM (persists across service restarts):
-        nssm set Tech11RelayServer AppEnvironmentExtra BIND_IP=192.168.1.50
+        nssm set Tech11RelayServerTest AppEnvironmentExtra "PORT=5001`nTECH11_DATA_DIR=C:\tech11-data-test"
 
     Via PowerShell (current session only, for manual testing):
-        $env:BIND_IP = "192.168.1.50"
+        $env:PORT = "5001"
+        $env:TECH11_DATA_DIR = "C:\tech11-data-test"
         venv\\Scripts\\python.exe run_production.py
 
-Run manually for testing (uses 0.0.0.0 unless BIND_IP is set):
+Run manually for testing (uses 0.0.0.0:5000 and the normal data dir unless overridden):
     venv\\Scripts\\python.exe run_production.py
 """
 
@@ -25,5 +32,6 @@ from app import app
 
 if __name__ == "__main__":
     bind_ip = os.environ.get("BIND_IP", "0.0.0.0")
-    print(f"Starting server bound to {bind_ip}:5000")
-    serve(app, host=bind_ip, port=5000, threads=8)
+    port = int(os.environ.get("PORT", "5000"))
+    print(f"Starting server bound to {bind_ip}:{port}")
+    serve(app, host=bind_ip, port=port, threads=8)

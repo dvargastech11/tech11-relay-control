@@ -1021,13 +1021,17 @@ def admin_remove_floor(building_id, elevator_number, floor_number):
 import platform
 
 # Path to this repo's checkout on the server, and the service name that
-# runs it. Update these to match your actual deployment.
-#   Windows: REPO_DIR = r"C:\tech11-relay-control", SERVICE_NAME = the NSSM
-#            service name you used (e.g. "Tech11RelayServer")
-#   Linux:   REPO_DIR = "/home/admin/tech11-relay-control",
+# runs it. Overridable via REPO_DIR / SERVICE_NAME environment variables -
+# ESSENTIAL for a test instance running from a separate checkout/service,
+# otherwise "Pull Latest Code" and service restarts would operate on
+# PRODUCTION's checkout and service instead of the test instance's own.
+#   Windows default: REPO_DIR = r"C:\tech11-relay-control", SERVICE_NAME =
+#            the NSSM service name you used (e.g. "Tech11RelayServer")
+#   Linux default:   REPO_DIR = "/home/admin/tech11-relay-control",
 #            SERVICE_NAME = "vyzcayne-elevator.service"
-REPO_DIR = r"C:\tech11-relay-control"
-SERVICE_NAME = "Tech11RelayServer"
+_default_repo_dir = r"C:\tech11-relay-control" if platform.system() == "Windows" else "/home/admin/tech11-relay-control"
+REPO_DIR = os.environ.get("REPO_DIR", _default_repo_dir)
+SERVICE_NAME = os.environ.get("SERVICE_NAME", "Tech11RelayServer")
 
 
 def _restart_service():
@@ -1087,4 +1091,4 @@ def update_from_git():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")), debug=True)
