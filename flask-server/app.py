@@ -875,7 +875,6 @@ def admin_assign_device(building_id, elevator_number):
         mac = request.form.get("mac", "").strip()
         ip = request.form.get("ip", "").strip()
         device_name = request.form.get("device_name", "").strip()
-        external_input_monitoring = request.form.get("external_input_monitoring") == "on"
 
         if not mac or not ip:
             flash("MAC address and IP are both required.")
@@ -901,7 +900,6 @@ def admin_assign_device(building_id, elevator_number):
                     push_message = f"Could not read local firmware.bin: {e}"
 
             bstore.assign_device(data, building_id, elevator_number, mac, ip, device_name)
-            bstore.set_external_input_monitoring(data, building_id, elevator_number, external_input_monitoring)
 
             # Push the name to the actual device too - previously this only
             # saved a local label in buildings.json, which is why renaming
@@ -939,7 +937,6 @@ def admin_assign_device(building_id, elevator_number):
         "device_mac": request.args.get("mac", elevator.get("device_mac") or ""),
         "device_ip": request.args.get("ip", elevator.get("device_ip") or ""),
         "device_name": request.args.get("name", elevator.get("device_name") or ""),
-        "external_input_monitoring_enabled": elevator.get("external_input_monitoring_enabled", False),
     }
 
     return render_template(
