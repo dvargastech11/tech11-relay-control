@@ -464,6 +464,52 @@ static void handleTrigger() {
 // Diagnostic-only channel test - human admin login (not API key), allows
 // testing all 48 physical channels. Used by the management page's
 // per-board test grid.
+// Machine (API key) command used by the website's operator "ACTIVATE ALL
+// BUTTONS" test: hold a list of relays for durationMs, or release them with
+// durationMs = 0. Duration is capped at MAX_HOLD_MS on the device itself, and
+// holds run on the normal per-relay timers, so they auto-release even if the
+// server or browser disappears. Kept separate from /trigger on purpose so the
+// normal 5-second floor-call path is not touched.
+//   POST /hold  {"relays":[1,2,3], "durationMs":600000}   (0 = release)
+static void handleHold() {
+  if (!checkApiKey()) return;
+
+  if (server.method() != HTTP_POST) {
+    server.send(405, "application/json", "{\"error\":\"Method Not Allowed\"}");
+    return;
+  }
+
+  StaticJsonDocument<768> doc;
+  DeserializationError err = deserializeJson(doc, server.arg("plain"));
+  if (err || !doc["relays"].is<JsonArray>()) {
+    server.send(400, "application/json", "{\"error\":\"Invalid JSON or missing relays array\"}");
+    return;
+  }
+
+  long durationMs = doc["durationMs"] | 0L;
+  if (durationMs < 0) {
+    server.send(400, "application/json", "{\"error\":\"Invalid duration\"}");
+    return;
+  }
+  if ((unsigned long)durationMs > MAX_HOLD_MS) durationMs = MAX_HOLD_MS;
+
+  int relays[HARDWARE_CHANNELS];
+  int count = 0;
+  for (JsonVariant v : doc["relays"].as<JsonArray>()) {
+    if (count >= HARDWARE_CHANNELS) break;
+    relays[count++] = v.as<int>();
+  }
+
+  if (durationMs == 0) {
+    releaseRelays(relays, count);
+  } else {
+    holdRelays(relays, count, (unsigned long)durationMs);
+  }
+
+  server.send(200, "application/json",
+              "{\"status\":\"success\",\"count\":" + String(count) + ",\"durationMs\":" + String(durationMs) + "}");
+}
+
 static void handleDiagTrigger() {
   if (!checkAuth()) return;
 
@@ -690,6 +736,7 @@ void registerWebHandlers() {
   server.on("/config/restore", HTTP_POST, handleConfigRestoreSubmit);
 
   server.on("/trigger", HTTP_POST, handleTrigger);
+  server.on("/hold", HTTP_POST, handleHold);
   server.on("/diag/trigger", HTTP_POST, handleDiagTrigger);
   server.on("/diag/test/all-on", HTTP_POST, handleTestAllOn);
   server.on("/diag/test/all-off", HTTP_POST, handleTestAllOff);

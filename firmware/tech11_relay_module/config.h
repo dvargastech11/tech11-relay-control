@@ -67,6 +67,11 @@
 // (16 channels each, 48 available, 47 used - matches one elevator's floor
 // count). Replaces the earlier 2-relay direct-GPIO test config.
 #define NUM_RELAYS 48  // Lobby (always present) + up to 47 numbered floors = 48 total - no spare channel left in a fully-configured elevator
+
+// Hard cap on how long ANY /hold request can keep relays energized (the
+// "ACTIVATE ALL BUTTONS" operator test). Enforced on the device itself, so
+// relays release on their own even if the server or browser goes away.
+#define MAX_HOLD_MS 600000UL // 10 minutes
 #define RELAY_ACTIVE_LEVEL LOW    // ACEIRMC 16-channel relay board is low-level trigger
 #define RELAY_INACTIVE_LEVEL HIGH
 

@@ -23,6 +23,7 @@ Local Users and Groups) to add/remove/change passwords for admin accounts.
 
 import os
 import ipaddress
+from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
 import subprocess
@@ -104,6 +105,7 @@ import device_config_store as devcfg
 import nxwitness_config as nxcfg
 import pending_changes_store as pending
 import external_api_config as extapi
+import hold_state_store as hold_state
 
 REQUEST_TIMEOUT_SEC = 3
 HOLD_MS = 5000  # fixed 5 second hold for all floor buttons
@@ -206,6 +208,11 @@ def activate(building_id, elevator_number, floor_number, duration_ms):
     if duration_ms <= 0:
         return jsonify({"success": False, "error": "Duration must be greater than 0"}), 400
 
+    # While ALL BUTTONS is held on, a normal 5-second press would reset that
+    # relay's timer and release it early - the relay is already on, so no-op.
+    if hold_state.is_on(building_id):
+        return jsonify({"success": True, "message": "All buttons are currently held on"})
+
     # Relay number on the physical module = position of this floor in the
     # elevator's floor list (1-indexed) - matches how the module's MCP23017
     # channels are wired up in sequence.
@@ -267,9 +274,95 @@ def api_activate_relay():
     if not bstore.is_floor_available_now(floor):
         return jsonify({"success": False, "error": "This floor is not currently available"}), 403
 
+    if hold_state.is_on(building["id"]):
+        return jsonify({"success": True, "message": "All buttons are currently held on"})
+
     relay_num = elevator["floors"].index(floor) + 1
     success, message = send_relay_command(elevator["device_ip"], elevator.get("device_mac"), relay_num, HOLD_MS)
     return jsonify({"success": success, "message": message})
+
+
+# ---- ALL BUTTONS operator test (public, like the other operator controls) ----
+
+ALL_BUTTONS_HOLD_SECONDS = 10 * 60  # auto-off if nobody turns it off; also enforced on the devices
+
+
+def _hold_building(building, hold):
+    """Sends a hold (hold=True: every currently-available floor, for 10
+    minutes) or a release (hold=False: every floor) to each assigned device
+    in the building, concurrently. Relay number = floor position + 1, same
+    as the normal floor buttons. Returns (succeeded_count, failed_messages)."""
+    jobs = []
+    for elevator in building["elevators"]:
+        if not elevator.get("device_ip") or not elevator.get("device_mac"):
+            continue  # nothing to hold on an elevator with no device
+        if hold:
+            relays = [i + 1 for i, f in enumerate(elevator["floors"]) if bstore.is_floor_available_now(f)]
+        else:
+            relays = list(range(1, len(elevator["floors"]) + 1))
+        if relays:
+            jobs.append((elevator, relays))
+
+    if not jobs:
+        return 0, []
+
+    duration_ms = ALL_BUTTONS_HOLD_SECONDS * 1000 if hold else 0
+    succeeded, failed = 0, []
+    with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
+        futures = [(elevator, pool.submit(devsvc.hold_relays, elevator["device_ip"],
+                                          elevator["device_mac"], relays, duration_ms))
+                   for elevator, relays in jobs]
+        for elevator, future in futures:
+            ok, message = future.result()
+            if ok:
+                succeeded += 1
+            else:
+                failed.append(f"Elevator {elevator['elevator_number']} ({message})")
+    return succeeded, failed
+
+
+@app.route("/all-buttons/<building_id>/status")
+def all_buttons_status(building_id):
+    return jsonify({
+        "on": hold_state.is_on(building_id),
+        "remaining_seconds": hold_state.remaining_seconds(building_id),
+    })
+
+
+@app.route("/all-buttons/<building_id>/<action>", methods=["POST"])
+def all_buttons_toggle(building_id, action):
+    if action not in ("on", "off"):
+        return jsonify({"success": False, "error": "Unknown action"}), 404
+
+    data = bstore.load_data()
+    building = bstore.get_building(data, building_id)
+    if not building:
+        return jsonify({"success": False, "error": "Unknown building"}), 404
+
+    succeeded, failed = _hold_building(building, hold=(action == "on"))
+
+    error = None
+    if action == "on":
+        success = succeeded > 0
+        if success:
+            hold_state.start(building_id, ALL_BUTTONS_HOLD_SECONDS)
+        elif not failed:
+            error = "No elevators with a device assigned"
+        else:
+            error = "No elevator could be reached"
+    else:
+        # Off always clears the state. Any device that couldn't be reached
+        # releases itself when its own 10-minute timer runs out.
+        hold_state.stop(building_id)
+        success = True
+
+    return jsonify({
+        "success": success,
+        "on": hold_state.is_on(building_id),
+        "remaining_seconds": hold_state.remaining_seconds(building_id),
+        "failed": failed,
+        "error": error,
+    })
 
 
 # ---- ADMIN: TEST BUTTONS (raw relay test, bypasses floor/schedule config) ----

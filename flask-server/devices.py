@@ -167,6 +167,29 @@ def reboot_device(ip, mac):
         return False
 
 
+def hold_relays(ip, mac, relays, duration_ms):
+    """Holds a list of relays on a device for duration_ms (the device caps
+    this at 10 minutes and releases them on its own), or releases them when
+    duration_ms is 0. Returns (success, message)."""
+    if not ip or not mac:
+        return False, "no device assigned"
+    api_key = compute_device_api_key(mac)
+    try:
+        resp = requests.post(
+            f"http://{ip}/hold",
+            json={"relays": relays, "durationMs": duration_ms},
+            headers={"X-API-Key": api_key},
+            timeout=REQUEST_TIMEOUT_SEC,
+        )
+    except requests.RequestException:
+        return False, "unreachable"
+    if resp.status_code == 200:
+        return True, "ok"
+    if resp.status_code == 404:
+        return False, "firmware too old (needs the update that adds /hold)"
+    return False, f"device returned HTTP {resp.status_code}"
+
+
 def update_network(ip, mac, payload):
     """payload: {"deviceName", "useDHCP", "staticIP", "gateway", "subnet"}"""
     if not ip or not mac:
