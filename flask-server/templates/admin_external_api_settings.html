@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}External API{% endblock %}
+{% block content %}
+  <h1>External API - Elevator Activation</h1>
+  <p style="color:#888; max-width:600px; margin:0 auto 20px;">
+    Lets an external system trigger a relay by naming the Building, Elevator, and Floor -
+    no need to know internal MAC addresses, IPs, or raw relay numbers.
+  </p>
+
+  <div style="max-width:600px; margin:0 auto 24px; background:#262626; border-radius:10px; padding:16px;">
+    <h3 style="margin-top:0; color:#aaa;">API Key</h3>
+    {% if api_key %}
+      <input type="text" readonly value="{{ api_key }}" onclick="this.select();"
+        style="width:100%; padding:10px; border-radius:6px; border:1px solid #444;
+        background:#1a1a1a; color:#2fbf4f; font-family:monospace; box-sizing:border-box; margin-bottom:12px;">
+    {% else %}
+      <p style="color:#e0a800;">No API key generated yet - the endpoint won't accept any requests until one exists.</p>
+    {% endif %}
+    <form method="POST" onsubmit="return confirm('Generate a new key? The old one stops working immediately - any external system using it will need updating.');">
+      <button type="submit" style="padding:10px 16px; border:none; border-radius:8px;
+        background:{{ '#7a1f1f' if api_key else '#2d6cdf' }}; color:white; cursor:pointer;">
+        {{ 'Regenerate Key' if api_key else 'Generate Key' }}
+      </button>
+    </form>
+  </div>
+
+  <div style="max-width:600px; margin:0 auto; background:#262626; border-radius:10px; padding:16px;">
+    <h3 style="margin-top:0; color:#aaa;">Request Format</h3>
+    <p style="color:#888;">POST to <code>/api/activate</code> with header <code>X-API-Key: &lt;your key&gt;</code> and a JSON body:</p>
+    <pre style="background:#1a1a1a; padding:12px; border-radius:6px; color:#eee; overflow-x:auto;">{
+  "building": "South Tower",
+  "elevator": "1",
+  "floor": "5"
+}</pre>
+    <p style="color:#888;">Example using curl:</p>
+    <pre style="background:#1a1a1a; padding:12px; border-radius:6px; color:#eee; overflow-x:auto; font-size:13px;">curl -X POST http://&lt;server&gt;:5000/api/activate \
+  -H "X-API-Key: {{ api_key or '<your key>' }}" \
+  -H "Content-Type: application/json" \
+  -d '{"building": "South Tower", "elevator": "1", "floor": "5"}'</pre>
+  </div>
+{% endblock %}

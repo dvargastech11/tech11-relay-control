@@ -3,7 +3,6 @@
 #include "auth.h"
 #include "network_config.h"
 #include "relay_control.h"
-#include "external_input.h"
 #include "activity_log.h"
 #include "ota_update.h"
 
@@ -465,6 +464,52 @@ static void handleTrigger() {
 // Diagnostic-only channel test - human admin login (not API key), allows
 // testing all 48 physical channels. Used by the management page's
 // per-board test grid.
+// Machine (API key) command used by the website's operator "ACTIVATE ALL
+// BUTTONS" test: hold a list of relays for durationMs, or release them with
+// durationMs = 0. Duration is capped at MAX_HOLD_MS on the device itself, and
+// holds run on the normal per-relay timers, so they auto-release even if the
+// server or browser disappears. Kept separate from /trigger on purpose so the
+// normal 5-second floor-call path is not touched.
+//   POST /hold  {"relays":[1,2,3], "durationMs":600000}   (0 = release)
+static void handleHold() {
+  if (!checkApiKey()) return;
+
+  if (server.method() != HTTP_POST) {
+    server.send(405, "application/json", "{\"error\":\"Method Not Allowed\"}");
+    return;
+  }
+
+  StaticJsonDocument<768> doc;
+  DeserializationError err = deserializeJson(doc, server.arg("plain"));
+  if (err || !doc["relays"].is<JsonArray>()) {
+    server.send(400, "application/json", "{\"error\":\"Invalid JSON or missing relays array\"}");
+    return;
+  }
+
+  long durationMs = doc["durationMs"] | 0L;
+  if (durationMs < 0) {
+    server.send(400, "application/json", "{\"error\":\"Invalid duration\"}");
+    return;
+  }
+  if ((unsigned long)durationMs > MAX_HOLD_MS) durationMs = MAX_HOLD_MS;
+
+  int relays[HARDWARE_CHANNELS];
+  int count = 0;
+  for (JsonVariant v : doc["relays"].as<JsonArray>()) {
+    if (count >= HARDWARE_CHANNELS) break;
+    relays[count++] = v.as<int>();
+  }
+
+  if (durationMs == 0) {
+    releaseRelays(relays, count);
+  } else {
+    holdRelays(relays, count, (unsigned long)durationMs);
+  }
+
+  server.send(200, "application/json",
+              "{\"status\":\"success\",\"count\":" + String(count) + ",\"durationMs\":" + String(durationMs) + "}");
+}
+
 static void handleDiagTrigger() {
   if (!checkAuth()) return;
 
@@ -622,24 +667,6 @@ static void handleStatusBoards() {
   server.send(200, "application/json", output);
 }
 
-// Reports the external digital input's current state - a spare GPIO
-// watching an EXTERNAL relay's dry contact, unrelated to the 48 floor-call
-// relays. The server polls this to detect a "stuck closed" condition and
-// fire an Nx Witness alert.
-static void handleStatusExternal() {
-  if (!checkApiKey()) return;
-
-  StaticJsonDocument<256> doc;
-  bool closed = isExternalInputClosed();
-  doc["closed"] = closed;
-  doc["stateDurationMs"] = externalInputStateDurationMs();
-  doc["stuckClosed"] = isExternalInputStuckClosed();
-
-  String output;
-  serializeJson(doc, output);
-  server.send(200, "application/json", output);
-}
-
 // Explicitly triggers a fresh MCP23017 board scan - this is the ONLY way
 // boards get re-scanned after boot now (see handleStatusBoards() above,
 // which just reports the cached result). Admin-triggered only, not
@@ -709,6 +736,7 @@ void registerWebHandlers() {
   server.on("/config/restore", HTTP_POST, handleConfigRestoreSubmit);
 
   server.on("/trigger", HTTP_POST, handleTrigger);
+  server.on("/hold", HTTP_POST, handleHold);
   server.on("/diag/trigger", HTTP_POST, handleDiagTrigger);
   server.on("/diag/test/all-on", HTTP_POST, handleTestAllOn);
   server.on("/diag/test/all-off", HTTP_POST, handleTestAllOff);
@@ -719,7 +747,6 @@ void registerWebHandlers() {
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/status/boards", HTTP_GET, handleStatusBoards);
   server.on("/diag/rescan-boards", HTTP_POST, handleRescanBoards);
-  server.on("/status/external", HTTP_GET, handleStatusExternal);
-  server.on("/reboot", HTTP_POST, handleRebootCommand);
+    server.on("/reboot", HTTP_POST, handleRebootCommand);
   server.on("/network/api-save", HTTP_POST, handleApiNetworkSave);
 }

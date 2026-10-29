@@ -11,6 +11,12 @@ void activateRelay(int relayNum, int durationMs);   // production path, capped a
 void activateChannelDiag(int channel1to48, int durationMs); // diagnostic path, full 48 channels
 void updateRelayTimers();
 
+// Hold (durationMs > 0) or release a list of relays in one call - used by the
+// operator "ACTIVATE ALL BUTTONS" test. Production range only (1..NUM_RELAYS).
+// Holds use the normal per-relay timers, so they auto-release at durationMs.
+void holdRelays(const int *relays, int count, unsigned long durationMs);
+void releaseRelays(const int *relays, int count);
+
 void scanMCPBoards();               // re-checks which boards actually respond
 bool isBoardOnline(int boardIndex); // 0, 1, or 2
 uint8_t getBoardAddress(int boardIndex);

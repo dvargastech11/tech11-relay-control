@@ -37,6 +37,13 @@
   </div>
   <div id="status"></div>
 
+  {% if building.elevators %}
+  <div style="margin-top:28px;">
+    <button id="allButtonsBtn" class="all-btn" onclick="toggleAllButtons()">ACTIVATE ALL BUTTONS</button>
+    <div id="allButtonsStatus" style="color:#aaa; font-size:13px; margin-top:8px; min-height:18px;"></div>
+  </div>
+  {% endif %}
+
   <style>
     .elevator-col {
       background: #262626;
@@ -74,6 +81,22 @@
     button.floor-btn.active {
       background: #2fbf4f;
     }
+    button.all-btn {
+      padding: 14px 32px;
+      font-size: 15px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      border: none;
+      border-radius: 8px;
+      background: #2d6cdf;
+      color: white;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    button.all-btn:hover { background: #3d7cef; }
+    button.all-btn:active { transform: scale(0.97); }
+    button.all-btn.on { background: #2fbf4f; }
+    button.all-btn:disabled { opacity: 0.6; cursor: wait; }
     button.floor-btn.disabled {
       background: #3a3a3a;
       color: #777;
@@ -84,8 +107,12 @@
   <script>
     const HOLD_MS = {{ hold_ms }};
     const statusEl = document.getElementById('status');
+    let allButtonsOn = false;
 
     async function activateRelay(buildingId, elevatorNumber, floorNumber, label, btnEl) {
+      // While ALL BUTTONS is on, every floor is already held - a normal press
+      // would only reset that relay's timer.
+      if (allButtonsOn) return;
       btnEl.classList.add('active');
       statusEl.textContent = `Sending: ${label} (Elevator ${elevatorNumber})...`;
 
@@ -102,7 +129,79 @@
         statusEl.textContent = `Request failed: ${err}`;
       }
 
-      setTimeout(() => btnEl.classList.remove('active'), HOLD_MS);
+      setTimeout(() => { if (!allButtonsOn) btnEl.classList.remove('active'); }, HOLD_MS);
     }
+
+    // ---- ACTIVATE ALL BUTTONS (on/off, auto-off after 10 minutes) ----
+    const BUILDING_ID = '{{ building.id }}';
+    const allBtn = document.getElementById('allButtonsBtn');
+    const allStatusEl = document.getElementById('allButtonsStatus');
+    let allButtonsExpiresAt = 0;
+
+    function formatRemaining(ms) {
+      const total = Math.max(0, Math.round(ms / 1000));
+      const m = Math.floor(total / 60);
+      const s = String(total % 60).padStart(2, '0');
+      return m + ':' + s;
+    }
+
+    function applyAllButtonsState(on, remainingSeconds) {
+      allButtonsOn = on;
+      allButtonsExpiresAt = on ? Date.now() + remainingSeconds * 1000 : 0;
+      if (allBtn) allBtn.classList.toggle('on', on);
+      document.querySelectorAll('button.floor-btn:not(.disabled)').forEach(b => b.classList.toggle('active', on));
+      renderAllButtonsCountdown();
+    }
+
+    function renderAllButtonsCountdown() {
+      if (!allStatusEl) return;
+      if (!allButtonsOn) { allStatusEl.textContent = ''; return; }
+      const left = allButtonsExpiresAt - Date.now();
+      if (left <= 0) {
+        applyAllButtonsState(false, 0);
+        statusEl.textContent = 'All buttons timed out and were released.';
+        return;
+      }
+      allStatusEl.textContent = 'ON - auto-off in ' + formatRemaining(left) + '. Tap again to turn off.';
+    }
+
+    async function syncAllButtons() {
+      try {
+        const r = await fetch(`/all-buttons/${BUILDING_ID}/status`);
+        const d = await r.json();
+        applyAllButtonsState(d.on, d.remaining_seconds);
+      } catch (e) { /* keep the current display; try again next poll */ }
+    }
+
+    async function toggleAllButtons() {
+      if (!allButtonsOn &&
+          !confirm('Hold every available floor button on every elevator for up to 10 minutes?')) {
+        return;
+      }
+      const action = allButtonsOn ? 'off' : 'on';
+      allBtn.disabled = true;
+      allStatusEl.textContent = action === 'on' ? 'Activating all buttons...' : 'Turning off...';
+      try {
+        const r = await fetch(`/all-buttons/${BUILDING_ID}/${action}`, {method: 'POST'});
+        const d = await r.json();
+        applyAllButtonsState(d.on, d.remaining_seconds || 0);
+        if (!d.success) {
+          statusEl.textContent = 'All buttons: ' + (d.error || 'request failed');
+        } else if (d.failed && d.failed.length) {
+          statusEl.textContent = 'All buttons - not reached: ' + d.failed.join(', ') +
+            (action === 'off' ? ' (releases by itself within 10 minutes)' : '');
+        } else {
+          statusEl.textContent = action === 'on' ? 'All buttons held on.' : 'All buttons released.';
+        }
+      } catch (e) {
+        statusEl.textContent = 'Request failed: ' + e;
+        syncAllButtons();
+      }
+      allBtn.disabled = false;
+    }
+
+    setInterval(renderAllButtonsCountdown, 1000);
+    setInterval(syncAllButtons, 5000);
+    syncAllButtons();
   </script>
 {% endblock %}

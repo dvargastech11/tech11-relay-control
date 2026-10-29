@@ -23,6 +23,7 @@ Local Users and Groups) to add/remove/change passwords for admin accounts.
 
 import os
 import ipaddress
+from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
 import subprocess
@@ -102,6 +103,8 @@ import ip_acl_store as ipacl
 import device_config_store as devcfg
 import nxwitness_config as nxcfg
 import pending_changes_store as pending
+import external_api_config as extapi
+import hold_state_store as hold_state
 
 REQUEST_TIMEOUT_SEC = 3
 HOLD_MS = 5000  # fixed 5 second hold for all floor buttons
@@ -204,6 +207,11 @@ def activate(building_id, elevator_number, floor_number, duration_ms):
     if duration_ms <= 0:
         return jsonify({"success": False, "error": "Duration must be greater than 0"}), 400
 
+    # While ALL BUTTONS is held on, a normal 5-second press would reset that
+    # relay's timer and release it early - the relay is already on, so no-op.
+    if hold_state.is_on(building_id):
+        return jsonify({"success": True, "message": "All buttons are currently held on"})
+
     # Relay number on the physical module = position of this floor in the
     # elevator's floor list (1-indexed) - matches how the module's MCP23017
     # channels are wired up in sequence.
@@ -211,6 +219,149 @@ def activate(building_id, elevator_number, floor_number, duration_ms):
 
     success, message = send_relay_command(elevator["device_ip"], elevator.get("device_mac"), relay_num, duration_ms)
     return jsonify({"success": success, "message": message})
+
+
+@app.route("/api/activate", methods=["POST"])
+def api_activate_relay():
+    """External integration endpoint - lets another system trigger a
+    relay by Building name + Elevator number + Floor number, without
+    needing to know internal MAC addresses, IPs, or raw relay numbers.
+    Authenticated via a dedicated API key (X-API-Key header) - separate
+    from the human admin login, since external systems can't do a
+    browser login flow. Manage the key via /admin/external-api-settings.
+
+    Expected JSON body:
+        {"building": "South Tower", "elevator": "1", "floor": "5"}
+    """
+    api_key = request.headers.get("X-API-Key", "")
+    if not extapi.is_valid_key(api_key):
+        return jsonify({"success": False, "error": "Invalid or missing API key"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    building_name = str(payload.get("building", "")).strip()
+    elevator_num_raw = str(payload.get("elevator", "")).strip()
+    floor_num_raw = str(payload.get("floor", "")).strip()
+
+    if not building_name or not elevator_num_raw or not floor_num_raw:
+        return jsonify({"success": False, "error": "Missing required field(s): building, elevator, floor"}), 400
+
+    data = bstore.load_data()
+    building = bstore.get_building_by_name(data, building_name)
+    if not building:
+        return jsonify({"success": False, "error": f"No building found matching '{building_name}'"}), 404
+
+    # Elevator number may arrive as "01", "1", etc. - try an exact match
+    # first (in case it's stored with leading zeros too), then fall back
+    # to a leading-zero-stripped comparison.
+    elevator = bstore.get_elevator(building, elevator_num_raw)
+    if not elevator:
+        normalized = elevator_num_raw.lstrip("0") or "0"
+        elevator = next((e for e in building["elevators"]
+                          if str(e["elevator_number"]).lstrip("0") == normalized), None)
+    if not elevator:
+        return jsonify({"success": False, "error": f"No elevator '{elevator_num_raw}' found in building '{building_name}'"}), 404
+
+    try:
+        floor_number_int = int(floor_num_raw)
+    except ValueError:
+        return jsonify({"success": False, "error": f"'{floor_num_raw}' is not a valid floor number"}), 400
+
+    floor = next((f for f in elevator["floors"] if f["number"] == floor_number_int), None)
+    if not floor:
+        return jsonify({"success": False, "error": f"Floor {floor_number_int} not configured on this elevator"}), 404
+
+    if not bstore.is_floor_available_now(floor):
+        return jsonify({"success": False, "error": "This floor is not currently available"}), 403
+
+    if hold_state.is_on(building["id"]):
+        return jsonify({"success": True, "message": "All buttons are currently held on"})
+
+    relay_num = elevator["floors"].index(floor) + 1
+    success, message = send_relay_command(elevator["device_ip"], elevator.get("device_mac"), relay_num, HOLD_MS)
+    return jsonify({"success": success, "message": message})
+
+
+# ---- ALL BUTTONS operator test (public, like the other operator controls) ----
+
+ALL_BUTTONS_HOLD_SECONDS = 10 * 60  # auto-off if nobody turns it off; also enforced on the devices
+
+
+def _hold_building(building, hold):
+    """Sends a hold (hold=True: every currently-available floor, for 10
+    minutes) or a release (hold=False: every floor) to each assigned device
+    in the building, concurrently. Relay number = floor position + 1, same
+    as the normal floor buttons. Returns (succeeded_count, failed_messages)."""
+    jobs = []
+    for elevator in building["elevators"]:
+        if not elevator.get("device_ip") or not elevator.get("device_mac"):
+            continue  # nothing to hold on an elevator with no device
+        if hold:
+            relays = [i + 1 for i, f in enumerate(elevator["floors"]) if bstore.is_floor_available_now(f)]
+        else:
+            relays = list(range(1, len(elevator["floors"]) + 1))
+        if relays:
+            jobs.append((elevator, relays))
+
+    if not jobs:
+        return 0, []
+
+    duration_ms = ALL_BUTTONS_HOLD_SECONDS * 1000 if hold else 0
+    succeeded, failed = 0, []
+    with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
+        futures = [(elevator, pool.submit(devsvc.hold_relays, elevator["device_ip"],
+                                          elevator["device_mac"], relays, duration_ms))
+                   for elevator, relays in jobs]
+        for elevator, future in futures:
+            ok, message = future.result()
+            if ok:
+                succeeded += 1
+            else:
+                failed.append(f"Elevator {elevator['elevator_number']} ({message})")
+    return succeeded, failed
+
+
+@app.route("/all-buttons/<building_id>/status")
+def all_buttons_status(building_id):
+    return jsonify({
+        "on": hold_state.is_on(building_id),
+        "remaining_seconds": hold_state.remaining_seconds(building_id),
+    })
+
+
+@app.route("/all-buttons/<building_id>/<action>", methods=["POST"])
+def all_buttons_toggle(building_id, action):
+    if action not in ("on", "off"):
+        return jsonify({"success": False, "error": "Unknown action"}), 404
+
+    data = bstore.load_data()
+    building = bstore.get_building(data, building_id)
+    if not building:
+        return jsonify({"success": False, "error": "Unknown building"}), 404
+
+    succeeded, failed = _hold_building(building, hold=(action == "on"))
+
+    error = None
+    if action == "on":
+        success = succeeded > 0
+        if success:
+            hold_state.start(building_id, ALL_BUTTONS_HOLD_SECONDS)
+        elif not failed:
+            error = "No elevators with a device assigned"
+        else:
+            error = "No elevator could be reached"
+    else:
+        # Off always clears the state. Any device that couldn't be reached
+        # releases itself when its own 10-minute timer runs out.
+        hold_state.stop(building_id)
+        success = True
+
+    return jsonify({
+        "success": success,
+        "on": hold_state.is_on(building_id),
+        "remaining_seconds": hold_state.remaining_seconds(building_id),
+        "failed": failed,
+        "error": error,
+    })
 
 
 # ---- ADMIN: TEST BUTTONS (raw relay test, bypasses floor/schedule config) ----
@@ -538,6 +689,20 @@ def admin_unassign_device(building_id, elevator_number):
     return redirect(url_for("devices_page"))
 
 
+@app.route("/admin/external-api-settings", methods=["GET", "POST"])
+@admin_required
+def admin_external_api_settings():
+    if request.method == "POST":
+        new_key = extapi.generate_new_key()
+        flash("New API key generated. Update any external system using the old key - it no longer works.")
+        return redirect(url_for("admin_external_api_settings"))
+
+    return render_template(
+        "admin_external_api_settings.html", active_page="external_api",
+        api_key=extapi.get_api_key(),
+    )
+
+
 @app.route("/admin/ip-acl", methods=["GET", "POST"])
 @admin_required
 def admin_ip_acl():
@@ -802,7 +967,6 @@ def admin_assign_device(building_id, elevator_number):
         mac = request.form.get("mac", "").strip()
         ip = request.form.get("ip", "").strip()
         device_name = request.form.get("device_name", "").strip()
-        external_input_monitoring = request.form.get("external_input_monitoring") == "on"
 
         if not mac or not ip:
             flash("MAC address and IP are both required.")
@@ -828,7 +992,6 @@ def admin_assign_device(building_id, elevator_number):
                     push_message = f"Could not read local firmware.bin: {e}"
 
             bstore.assign_device(data, building_id, elevator_number, mac, ip, device_name)
-            bstore.set_external_input_monitoring(data, building_id, elevator_number, external_input_monitoring)
 
             # Push the name to the actual device too - previously this only
             # saved a local label in buildings.json, which is why renaming
@@ -866,7 +1029,6 @@ def admin_assign_device(building_id, elevator_number):
         "device_mac": request.args.get("mac", elevator.get("device_mac") or ""),
         "device_ip": request.args.get("ip", elevator.get("device_ip") or ""),
         "device_name": request.args.get("name", elevator.get("device_name") or ""),
-        "external_input_monitoring_enabled": elevator.get("external_input_monitoring_enabled", False),
     }
 
     return render_template(
@@ -949,13 +1111,17 @@ def admin_remove_floor(building_id, elevator_number, floor_number):
 import platform
 
 # Path to this repo's checkout on the server, and the service name that
-# runs it. Update these to match your actual deployment.
-#   Windows: REPO_DIR = r"C:\tech11-relay-control", SERVICE_NAME = the NSSM
-#            service name you used (e.g. "Tech11RelayServer")
-#   Linux:   REPO_DIR = "/home/admin/tech11-relay-control",
+# runs it. Overridable via REPO_DIR / SERVICE_NAME environment variables -
+# ESSENTIAL for a test instance running from a separate checkout/service,
+# otherwise "Pull Latest Code" and service restarts would operate on
+# PRODUCTION's checkout and service instead of the test instance's own.
+#   Windows default: REPO_DIR = r"C:\tech11-relay-control", SERVICE_NAME =
+#            the NSSM service name you used (e.g. "Tech11RelayServer")
+#   Linux default:   REPO_DIR = "/home/admin/tech11-relay-control",
 #            SERVICE_NAME = "vyzcayne-elevator.service"
-REPO_DIR = r"C:\tech11-relay-control"
-SERVICE_NAME = "Tech11RelayServer"
+_default_repo_dir = r"C:\tech11-relay-control" if platform.system() == "Windows" else "/home/admin/tech11-relay-control"
+REPO_DIR = os.environ.get("REPO_DIR", _default_repo_dir)
+SERVICE_NAME = os.environ.get("SERVICE_NAME", "Tech11RelayServer")
 
 
 def _restart_service():
@@ -1015,4 +1181,4 @@ def update_from_git():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")), debug=True)

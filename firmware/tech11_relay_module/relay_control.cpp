@@ -154,7 +154,7 @@ void setupRelayPins() {
   }
 }
 
-static void activateChannelInternal(int channelNum, int durationMs) {
+static void activateChannelInternal(int channelNum, int durationMs, bool logActivation = true) {
   if (channelNum < 1 || channelNum > HARDWARE_CHANNELS) return;
 
   uint8_t address, reg, bit;
@@ -174,7 +174,9 @@ static void activateChannelInternal(int channelNum, int durationMs) {
   relayStartTime[idx] = millis();
   relayDuration[idx] = durationMs;
 
-  addLog("OUT", "Channel #" + String(channelNum) + " activated for " + String(durationMs) + "ms");
+  if (logActivation) {
+    addLog("OUT", "Channel #" + String(channelNum) + " activated for " + String(durationMs) + "ms");
+  }
 }
 
 void activateRelay(int relayNum, int durationMs) {
@@ -188,6 +190,37 @@ void activateChannelDiag(int channel1to48, int durationMs) {
   // kept as a separate function so diagnostic triggers stay distinct from
   // real floor-call activity in the logs.
   activateChannelInternal(channel1to48, durationMs);
+}
+
+void holdRelays(const int *relays, int count, unsigned long durationMs) {
+  // One summary log line instead of one per relay, so holding a whole
+  // elevator doesn't flush the activity log.
+  int activated = 0;
+  for (int i = 0; i < count; i++) {
+    int ch = relays[i];
+    if (ch < 1 || ch > NUM_RELAYS) continue;
+    activateChannelInternal(ch, (int)durationMs, false);
+    activated++;
+  }
+  addLog("OUT", "Hold: " + String(activated) + " relay(s) for " + String(durationMs / 1000) + "s");
+}
+
+void releaseRelays(const int *relays, int count) {
+  int released = 0;
+  for (int i = 0; i < count; i++) {
+    int ch = relays[i];
+    if (ch < 1 || ch > NUM_RELAYS) continue;
+
+    uint8_t address, reg, bit;
+    int boardIndex;
+    resolveChannel(ch, address, reg, bit, boardIndex);
+    if (isBoardOnline(boardIndex)) {
+      setChannelBit(address, reg, bit, RELAY_INACTIVE_LEVEL == HIGH);
+    }
+    relayActive[ch - 1] = false;
+    released++;
+  }
+  addLog("OUT", "Hold released: " + String(released) + " relay(s)");
 }
 
 void updateRelayTimers() {
