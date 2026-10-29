@@ -348,7 +348,7 @@ def all_buttons_toggle(building_id, action):
         elif not failed:
             error = "No elevators with a device assigned"
         else:
-            error = "No elevator could be reached"
+            error = "No elevator accepted the command"
     else:
         # Off always clears the state. Any device that couldn't be reached
         # releases itself when its own 10-minute timer runs out.
