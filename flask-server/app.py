@@ -35,10 +35,9 @@ from flask_login import (
     login_required, current_user
 )
 import windows_auth
-from secret_key_store import get_secret_key
 
 app = Flask(__name__)
-app.secret_key = get_secret_key()  # SECRET_KEY env var, else a random key saved in the data dir
+app.secret_key = "CHANGE-THIS-TO-A-RANDOM-SECRET-BEFORE-PRODUCTION"
 
 login_manager = LoginManager()
 login_manager.init_app(app)
