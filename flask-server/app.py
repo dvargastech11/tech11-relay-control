@@ -751,24 +751,35 @@ def admin_ip_acl():
                     flash(f"'{new_entry}' isn't a valid IP address or CIDR range - not added.")
                     return redirect(url_for("admin_ip_acl"))
 
-                ipacl.add_entry(new_entry)
+                current_entries = ipacl.load_acl()
+                if new_entry in current_entries:
+                    flash(f"{new_entry} is already on the allowlist.")
+                    return redirect(url_for("admin_ip_acl"))
 
-                # Safety check: warn (don't block) if the list is about to
-                # start enforcing and the person's OWN current IP isn't on
-                # it - a self-lockout risk, but 127.0.0.1 stays available
-                # as a recovery path regardless, so this is a warning, not
-                # a hard stop.
+                # Self-lockout guard: refuse BEFORE saving if the new list would
+                # block the person making the change. (A warning after saving
+                # can never be seen - the next page load is already blocked.)
+                # The server itself (localhost) is always allowed, so it never
+                # triggers this.
                 current_ip = request.remote_addr
-                if not ipacl.is_allowed(current_ip):
-                    flash(f"Added {new_entry}. Warning: your current IP ({current_ip}) is NOT "
-                          f"on the list - you'll be blocked from the website (except via "
-                          f"localhost/RDP) after this. Add your own IP too if that's not intended.")
-                else:
-                    flash(f"Added {new_entry} to the allowlist.")
+                if not ipacl.is_allowed_by(current_entries + [new_entry], current_ip):
+                    flash(f"Not added. With {new_entry} as the list, your own address ({current_ip}) "
+                          f"would be blocked and you would be locked out of this site. "
+                          f"Add your own address, or a network that includes it, first.")
+                    return redirect(url_for("admin_ip_acl"))
+
+                ipacl.add_entry(new_entry)
+                flash(f"Added {new_entry} to the allowlist.")
             return redirect(url_for("admin_ip_acl"))
 
         elif action == "remove":
             entry = request.form.get("entry", "").strip()
+            remaining = [e for e in ipacl.load_acl() if e != entry]
+            current_ip = request.remote_addr
+            if not ipacl.is_allowed_by(remaining, current_ip):
+                flash(f"Not removed. Without {entry}, your own address ({current_ip}) would be "
+                      f"blocked and you would be locked out of this site.")
+                return redirect(url_for("admin_ip_acl"))
             ipacl.remove_entry(entry)
             flash(f"Removed {entry} from the allowlist.")
             return redirect(url_for("admin_ip_acl"))
