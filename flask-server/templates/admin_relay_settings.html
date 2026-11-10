@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Relay Settings{% endblock %}
+{% block content %}
+  <h1>Relay Settings</h1>
+  <p style="color:#888; max-width:520px; margin:0 auto 20px;">
+    How long a floor button holds its relay each time it is pressed. This applies to every
+    operator floor button and to the external API. ACTIVATE ALL BUTTONS has its own 10 minute limit.
+  </p>
+
+  {% if message %}
+    <p style="max-width:520px; margin:0 auto 14px; color:#2fbf4f;">{{ message }}</p>
+  {% endif %}
+  {% if error %}
+    <p style="max-width:520px; margin:0 auto 14px; color:#e74c3c;">{{ error }}</p>
+  {% endif %}
+
+  <form method="POST" style="max-width:520px; margin:0 auto; text-align:left; background:#262626; border-radius:10px; padding:16px;">
+    <label style="color:#aaa; font-size:14px;">Hold time (seconds)</label>
+    <input type="number" name="hold_seconds" value="{{ '%g' % hold_seconds }}" min="0.1" max="600" step="0.1" required
+      style="width:100%; padding:10px; margin:6px 0 8px; border-radius:6px; border:1px solid #444;
+      background:#1a1a1a; color:#eee; box-sizing:border-box;">
+    <p style="color:#666; font-size:12px; margin:0 0 16px;">
+      From 0.1 to 600 seconds. The default is 5.
+    </p>
+    <button type="submit" style="width:100%; padding:12px; border:none; border-radius:8px;
+      background:#2d6cdf; color:white; font-size:15px; cursor:pointer;">Save</button>
+  </form>
+
+  <p style="color:#888; font-size:13px; max-width:520px; margin:16px auto;">
+    Devices only honor this once they run the firmware release that adds it (1.0.5 or newer).
+    Devices on older firmware keep holding for 5 seconds.
+  </p>
+{% endblock %}
