@@ -7,6 +7,7 @@
     <strong style="color:#eee;">unrestricted</strong> (everyone allowed) - enforcement only begins
     once you add at least one entry. <code>127.0.0.1</code> (localhost) is always allowed, regardless
     of this list, as a recovery path if you ever lock yourself out remotely.
+    A change that would block your own address is refused, so you cannot lock yourself out from here.
   </p>
   <p style="color:#666; font-size:13px; max-width:500px; margin:0 auto 20px;">
     Your current connection is from: <strong style="color:#eee;">{{ current_ip }}</strong>

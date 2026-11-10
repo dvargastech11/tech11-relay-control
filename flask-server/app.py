@@ -105,9 +105,11 @@ import nxwitness_config as nxcfg
 import pending_changes_store as pending
 import external_api_config as extapi
 import hold_state_store as hold_state
+import relay_settings_store as relay_settings
 
 REQUEST_TIMEOUT_SEC = 3
-HOLD_MS = 5000  # fixed 5 second hold for all floor buttons
+# How long a floor press holds its relay is a setting now (Relay Settings page,
+# default 5 seconds) - see relay_settings.get_hold_ms().
 
 
 @app.before_request
@@ -120,13 +122,13 @@ def enforce_ip_allowlist():
 def send_relay_command(device_ip, device_mac, relay_num, duration_ms):
     """Send an HTTP activate command to an elevator's assigned ESP32 module.
 
-    NOTE: current module firmware expects POST JSON on /trigger, e.g.
+    Module firmware expects POST JSON on /trigger, e.g.
         POST http://<ip>/trigger
-        Body: {"relay": 1}
+        Body: {"relay": 1, "durationMs": 5000}
     Authenticated via the MAC-derived API key (X-API-Key header), same
-    scheme used by devices.py for status/reboot/network calls. It
-    currently ignores duration_ms and always holds for a hardcoded
-    5000ms server-side.
+    scheme used by devices.py for status/reboot/network calls. Firmware that
+    predates the hold-time setting ignores durationMs and always holds 5000ms;
+    newer firmware honors it (limited to 100ms..10 minutes on the device).
     """
     if not device_ip:
         return False, "No device assigned to this elevator"
@@ -134,7 +136,7 @@ def send_relay_command(device_ip, device_mac, relay_num, duration_ms):
         return False, "No MAC address on file for this elevator's device - re-assign it on the Assign Device page"
 
     url = f"http://{device_ip}/trigger"
-    payload = {"relay": relay_num}
+    payload = {"relay": relay_num, "durationMs": int(duration_ms)}
     api_key = devsvc.compute_device_api_key(device_mac)
     headers = {"X-API-Key": api_key}
 
@@ -182,7 +184,7 @@ def building_view(building_id):
         active_page="building",
         building=building,
         all_buildings=data["buildings"],
-        hold_ms=HOLD_MS,
+        hold_ms=relay_settings.get_hold_ms(),
     )
 
 
@@ -217,7 +219,10 @@ def activate(building_id, elevator_number, floor_number, duration_ms):
     # channels are wired up in sequence.
     relay_num = elevator["floors"].index(floor) + 1
 
-    success, message = send_relay_command(elevator["device_ip"], elevator.get("device_mac"), relay_num, duration_ms)
+    # The duration in the URL is NOT trusted: this route is public, and devices
+    # now honor a hold time, so anyone could otherwise hold a relay for minutes by
+    # editing the address. Only the admin-set value is used.
+    success, message = send_relay_command(elevator["device_ip"], elevator.get("device_mac"), relay_num, relay_settings.get_hold_ms())
     return jsonify({"success": success, "message": message})
 
 
@@ -277,7 +282,7 @@ def api_activate_relay():
         return jsonify({"success": True, "message": "All buttons are currently held on"})
 
     relay_num = elevator["floors"].index(floor) + 1
-    success, message = send_relay_command(elevator["device_ip"], elevator.get("device_mac"), relay_num, HOLD_MS)
+    success, message = send_relay_command(elevator["device_ip"], elevator.get("device_mac"), relay_num, relay_settings.get_hold_ms())
     return jsonify({"success": success, "message": message})
 
 
@@ -348,7 +353,7 @@ def all_buttons_toggle(building_id, action):
         elif not failed:
             error = "No elevators with a device assigned"
         else:
-            error = "No elevator could be reached"
+            error = "No elevator accepted the command"
     else:
         # Off always clears the state. Any device that couldn't be reached
         # releases itself when its own 10-minute timer runs out.
@@ -689,6 +694,28 @@ def admin_unassign_device(building_id, elevator_number):
     return redirect(url_for("devices_page"))
 
 
+@app.route("/admin/relay-settings", methods=["GET", "POST"])
+@admin_required
+def admin_relay_settings():
+    # The result is shown on this page directly rather than via flash(): the
+    # shared base template does not display flashed messages.
+    message = error = None
+    if request.method == "POST":
+        raw = request.form.get("hold_seconds", "").strip()
+        try:
+            hold_ms = relay_settings.set_hold_ms(round(float(raw) * 1000))
+        except (ValueError, OverflowError):
+            error = "Hold time must be a number from 0.1 to 600 seconds. Nothing was changed."
+        else:
+            message = f"Hold time set to {hold_ms / 1000:g} seconds."
+
+    return render_template(
+        "admin_relay_settings.html", active_page="relay_settings",
+        hold_seconds=relay_settings.get_hold_ms() / 1000,
+        message=message, error=error,
+    )
+
+
 @app.route("/admin/external-api-settings", methods=["GET", "POST"])
 @admin_required
 def admin_external_api_settings():
@@ -724,24 +751,35 @@ def admin_ip_acl():
                     flash(f"'{new_entry}' isn't a valid IP address or CIDR range - not added.")
                     return redirect(url_for("admin_ip_acl"))
 
-                ipacl.add_entry(new_entry)
+                current_entries = ipacl.load_acl()
+                if new_entry in current_entries:
+                    flash(f"{new_entry} is already on the allowlist.")
+                    return redirect(url_for("admin_ip_acl"))
 
-                # Safety check: warn (don't block) if the list is about to
-                # start enforcing and the person's OWN current IP isn't on
-                # it - a self-lockout risk, but 127.0.0.1 stays available
-                # as a recovery path regardless, so this is a warning, not
-                # a hard stop.
+                # Self-lockout guard: refuse BEFORE saving if the new list would
+                # block the person making the change. (A warning after saving
+                # can never be seen - the next page load is already blocked.)
+                # The server itself (localhost) is always allowed, so it never
+                # triggers this.
                 current_ip = request.remote_addr
-                if not ipacl.is_allowed(current_ip):
-                    flash(f"Added {new_entry}. Warning: your current IP ({current_ip}) is NOT "
-                          f"on the list - you'll be blocked from the website (except via "
-                          f"localhost/RDP) after this. Add your own IP too if that's not intended.")
-                else:
-                    flash(f"Added {new_entry} to the allowlist.")
+                if not ipacl.is_allowed_by(current_entries + [new_entry], current_ip):
+                    flash(f"Not added. With {new_entry} as the list, your own address ({current_ip}) "
+                          f"would be blocked and you would be locked out of this site. "
+                          f"Add your own address, or a network that includes it, first.")
+                    return redirect(url_for("admin_ip_acl"))
+
+                ipacl.add_entry(new_entry)
+                flash(f"Added {new_entry} to the allowlist.")
             return redirect(url_for("admin_ip_acl"))
 
         elif action == "remove":
             entry = request.form.get("entry", "").strip()
+            remaining = [e for e in ipacl.load_acl() if e != entry]
+            current_ip = request.remote_addr
+            if not ipacl.is_allowed_by(remaining, current_ip):
+                flash(f"Not removed. Without {entry}, your own address ({current_ip}) would be "
+                      f"blocked and you would be locked out of this site.")
+                return redirect(url_for("admin_ip_acl"))
             ipacl.remove_entry(entry)
             flash(f"Removed {entry} from the allowlist.")
             return redirect(url_for("admin_ip_acl"))

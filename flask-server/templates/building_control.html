@@ -185,10 +185,12 @@
         const r = await fetch(`/all-buttons/${BUILDING_ID}/${action}`, {method: 'POST'});
         const d = await r.json();
         applyAllButtonsState(d.on, d.remaining_seconds || 0);
+        const reasons = (d.failed && d.failed.length) ? d.failed.join('; ') : '';
         if (!d.success) {
-          statusEl.textContent = 'All buttons: ' + (d.error || 'request failed');
-        } else if (d.failed && d.failed.length) {
-          statusEl.textContent = 'All buttons - not reached: ' + d.failed.join(', ') +
+          statusEl.textContent = 'All buttons: ' + (d.error || 'request failed') +
+            (reasons ? ' - ' + reasons : '');
+        } else if (reasons) {
+          statusEl.textContent = 'All buttons - problem on: ' + reasons +
             (action === 'off' ? ' (releases by itself within 10 minutes)' : '');
         } else {
           statusEl.textContent = action === 'on' ? 'All buttons held on.' : 'All buttons released.';

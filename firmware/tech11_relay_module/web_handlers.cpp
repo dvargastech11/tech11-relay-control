@@ -433,6 +433,17 @@ static void handleConfigRestoreSubmit() {
 // MACHINE HANDLERS (API key required via checkApiKey())
 // ============================================================
 
+// Hold time for a normal floor press. The server sends "durationMs" (set on
+// the website's Relay Settings page). Missing or non-positive keeps the
+// original fixed 5 seconds; anything else is limited to 100 ms .. MAX_HOLD_MS
+// (10 minutes), so a bad request can never hold a relay indefinitely.
+static unsigned long pulseMsFromRequest(long requestedMs) {
+  if (requestedMs <= 0) return DEFAULT_PULSE_MS;
+  if (requestedMs < 100) return 100;
+  if ((unsigned long)requestedMs > MAX_HOLD_MS) return MAX_HOLD_MS;
+  return (unsigned long)requestedMs;
+}
+
 static void handleTrigger() {
   if (!checkApiKey()) return;
   addLog("IN", "HTTP /trigger received");
@@ -442,7 +453,7 @@ static void handleTrigger() {
     return;
   }
 
-  StaticJsonDocument<128> doc;
+  StaticJsonDocument<192> doc;
   DeserializationError err = deserializeJson(doc, server.arg("plain"));
 
   if (err || !doc.containsKey("relay")) {
@@ -457,8 +468,11 @@ static void handleTrigger() {
     return;
   }
 
-  activateRelay(relayNum, 5000);
-  server.send(200, "application/json", "{\"status\":\"success\",\"triggered_relay\":" + String(relayNum) + "}");
+  unsigned long holdMs = pulseMsFromRequest(doc["durationMs"] | 0L);
+
+  activateRelay(relayNum, (int)holdMs);
+  server.send(200, "application/json",
+              "{\"status\":\"success\",\"triggered_relay\":" + String(relayNum) + ",\"duration_ms\":" + String(holdMs) + "}");
 }
 
 // Diagnostic-only channel test - human admin login (not API key), allows

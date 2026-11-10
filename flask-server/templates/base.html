@@ -93,6 +93,7 @@
     <a href="/admin/nxwitness-settings" class="{{ 'active' if active_page == 'nxwitness_settings' else '' }}">Nx Witness</a>
     <a href="/admin/ip-acl" class="{{ 'active' if active_page == 'ip_acl' else '' }}">IP Allowlist</a>
     <a href="/admin/external-api-settings" class="{{ 'active' if active_page == 'external_api' else '' }}">External API</a>
+    <a href="/admin/relay-settings" class="{{ 'active' if active_page == 'relay_settings' else '' }}">Relay Settings</a>
     {% endif %}
   </nav>
 
@@ -101,6 +102,19 @@
     Logged in as {{ current_user.id }} ({{ current_user.role }}) &middot; <a href="/logout" style="color:#888;">Log out</a>
   </p>
   {% endif %}
+
+  {# Messages from flash() - previously only the login page displayed them, so every
+     other page's confirmations and warnings were silently dropped. #}
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div style="max-width:760px; margin:0 auto 18px; text-align:left;">
+      {% for message in messages %}
+      <div style="background:#2a2a2a; border-left:4px solid #2d6cdf; color:#eee; padding:10px 14px;
+        border-radius:6px; margin-bottom:8px; font-size:14px;">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
 
   {% block content %}{% endblock %}
 

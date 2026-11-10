@@ -72,6 +72,10 @@
 // "ACTIVATE ALL BUTTONS" operator test). Enforced on the device itself, so
 // relays release on their own even if the server or browser goes away.
 #define MAX_HOLD_MS 600000UL // 10 minutes
+
+// Hold time for a normal floor press when the server does not specify one
+// (the original fixed value, so older servers keep working unchanged).
+#define DEFAULT_PULSE_MS 5000UL
 #define RELAY_ACTIVE_LEVEL LOW    // ACEIRMC 16-channel relay board is low-level trigger
 #define RELAY_INACTIVE_LEVEL HIGH
 

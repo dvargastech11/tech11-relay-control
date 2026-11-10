@@ -186,7 +186,7 @@ def hold_relays(ip, mac, relays, duration_ms):
     if resp.status_code == 200:
         return True, "ok"
     if resp.status_code == 404:
-        return False, "firmware too old (needs the update that adds /hold)"
+        return False, "firmware too old, needs the release that adds /hold"
     return False, f"device returned HTTP {resp.status_code}"
 
 

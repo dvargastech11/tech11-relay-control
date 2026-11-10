@@ -65,11 +65,17 @@ def remove_entry(entry):
 
 
 def is_allowed(client_ip):
-    """True if this client IP should be let through."""
+    """True if this client IP should be let through, per the saved list."""
+    return is_allowed_by(load_acl(), client_ip)
+
+
+def is_allowed_by(entries, client_ip):
+    """Same decision as is_allowed(), but against a given list - used to check
+    whether a proposed change would block the person making it, BEFORE it is
+    saved."""
     if client_ip in ALWAYS_ALLOWED:
         return True
 
-    entries = load_acl()
     if not entries:
         return True  # empty list = unrestricted (see module docstring)
 
