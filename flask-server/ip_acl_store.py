@@ -36,10 +36,16 @@ ALWAYS_ALLOWED = ["127.0.0.1", "::1"]  # localhost - recovery path, never blocke
 
 def load_acl():
     os.makedirs(DATA_DIR, exist_ok=True)
-    if os.path.exists(DATA_FILE):
+    try:
         with open(DATA_FILE, "r") as f:
-            return json.load(f)
-    return []
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except (OSError, ValueError):
+        # Missing, unreadable, or corrupt file. Fail open: an empty list
+        # means unrestricted (see module docstring) - this runs on every
+        # request via before_request, so raising here would 500 the whole
+        # server, including the admin page needed to fix the file.
+        return []
 
 
 def save_acl(entries):
