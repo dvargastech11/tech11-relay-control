@@ -117,7 +117,7 @@
       statusEl.textContent = `Sending: ${label} (Elevator ${elevatorNumber})...`;
 
       try {
-        const response = await fetch(`/activate/${buildingId}/${elevatorNumber}/${floorNumber}/${HOLD_MS}`);
+        const response = await fetch(`/activate/${buildingId}/${elevatorNumber}/${floorNumber}`);
         const data = await response.json();
 
         if (data.success) {

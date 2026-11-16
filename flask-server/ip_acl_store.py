@@ -70,6 +70,18 @@ def remove_entry(entry):
     return entries
 
 
+def is_valid_entry(entry):
+    """True if entry parses as a plain IP address or a CIDR range."""
+    try:
+        if "/" in entry:
+            ipaddress.ip_network(entry, strict=False)
+        else:
+            ipaddress.ip_address(entry)
+        return True
+    except ValueError:
+        return False
+
+
 def is_allowed(client_ip):
     """True if this client IP should be let through, per the saved list."""
     return is_allowed_by(load_acl(), client_ip)

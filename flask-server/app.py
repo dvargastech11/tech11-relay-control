@@ -22,7 +22,6 @@ Local Users and Groups) to add/remove/change passwords for admin accounts.
 """
 
 import os
-import ipaddress
 from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
@@ -188,8 +187,8 @@ def building_view(building_id):
     )
 
 
-@app.route("/activate/<building_id>/<elevator_number>/<int:floor_number>/<int:duration_ms>")
-def activate(building_id, elevator_number, floor_number, duration_ms):
+@app.route("/activate/<building_id>/<elevator_number>/<int:floor_number>")
+def activate(building_id, elevator_number, floor_number):
     data = bstore.load_data()
     building = bstore.get_building(data, building_id)
     if not building:
@@ -206,9 +205,6 @@ def activate(building_id, elevator_number, floor_number, duration_ms):
     if not bstore.is_floor_available_now(floor):
         return jsonify({"success": False, "error": "This floor is not currently available"}), 403
 
-    if duration_ms <= 0:
-        return jsonify({"success": False, "error": "Duration must be greater than 0"}), 400
-
     # While ALL BUTTONS is held on, a normal 5-second press would reset that
     # relay's timer and release it early - the relay is already on, so no-op.
     if hold_state.is_on(building_id):
@@ -219,9 +215,8 @@ def activate(building_id, elevator_number, floor_number, duration_ms):
     # channels are wired up in sequence.
     relay_num = elevator["floors"].index(floor) + 1
 
-    # The duration in the URL is NOT trusted: this route is public, and devices
-    # now honor a hold time, so anyone could otherwise hold a relay for minutes by
-    # editing the address. Only the admin-set value is used.
+    # This route is public, so the hold duration is never taken from the
+    # caller - only the admin-set value is used.
     success, message = send_relay_command(elevator["device_ip"], elevator.get("device_mac"), relay_num, relay_settings.get_hold_ms())
     return jsonify({"success": success, "message": message})
 
@@ -453,6 +448,10 @@ def admin_test_buttons_fire():
 
     if relay_num < 1:
         return jsonify({"success": False, "error": "Relay number must be 1 or greater"}), 400
+
+    # The device clamps this too, but clamp here as well so this admin test
+    # page doesn't silently lie about what duration actually got sent.
+    duration_ms = min(max(duration_ms, relay_settings.MIN_HOLD_MS), relay_settings.MAX_HOLD_MS)
 
     success, message = send_relay_command(device_ip, device_mac, relay_num, duration_ms)
     return jsonify({"success": success, "message": message})
@@ -739,12 +738,7 @@ def admin_ip_acl():
                 # Validate before saving - reject anything that wouldn't
                 # actually parse as an IP or CIDR range, rather than
                 # silently storing a typo that then blocks everyone.
-                try:
-                    if "/" in new_entry:
-                        ipaddress.ip_network(new_entry, strict=False)
-                    else:
-                        ipaddress.ip_address(new_entry)
-                except ValueError:
+                if not ipacl.is_valid_entry(new_entry):
                     flash(f"'{new_entry}' isn't a valid IP address or CIDR range - not added.")
                     return redirect(url_for("admin_ip_acl"))
 
