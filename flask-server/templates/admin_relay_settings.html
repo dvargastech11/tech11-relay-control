@@ -7,13 +7,6 @@
     operator floor button and to the external API. ACTIVATE ALL BUTTONS has its own 10 minute limit.
   </p>
 
-  {% if message %}
-    <p style="max-width:520px; margin:0 auto 14px; color:#2fbf4f;">{{ message }}</p>
-  {% endif %}
-  {% if error %}
-    <p style="max-width:520px; margin:0 auto 14px; color:#e74c3c;">{{ error }}</p>
-  {% endif %}
-
   <form method="POST" style="max-width:520px; margin:0 auto; text-align:left; background:#262626; border-radius:10px; padding:16px;">
     <label style="color:#aaa; font-size:14px;">Hold time (seconds)</label>
     <input type="number" name="hold_seconds" value="{{ '%g' % hold_seconds }}" min="0.1" max="600" step="0.1" required
@@ -27,7 +20,7 @@
   </form>
 
   <p style="color:#888; font-size:13px; max-width:520px; margin:16px auto;">
-    Devices only honor this once they run the firmware release that adds it (1.0.5 or newer).
-    Devices on older firmware keep holding for 5 seconds.
+    Devices only honor this once they run a firmware release that includes it. No release
+    includes it yet. Devices on the current firmware keep holding for 5 seconds.
   </p>
 {% endblock %}

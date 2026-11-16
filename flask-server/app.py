@@ -697,22 +697,19 @@ def admin_unassign_device(building_id, elevator_number):
 @app.route("/admin/relay-settings", methods=["GET", "POST"])
 @admin_required
 def admin_relay_settings():
-    # The result is shown on this page directly rather than via flash(): the
-    # shared base template does not display flashed messages.
-    message = error = None
     if request.method == "POST":
         raw = request.form.get("hold_seconds", "").strip()
         try:
             hold_ms = relay_settings.set_hold_ms(round(float(raw) * 1000))
         except (ValueError, OverflowError):
-            error = "Hold time must be a number from 0.1 to 600 seconds. Nothing was changed."
+            flash("Hold time must be a number from 0.1 to 600 seconds. Nothing was changed.")
         else:
-            message = f"Hold time set to {hold_ms / 1000:g} seconds."
+            flash(f"Hold time set to {hold_ms / 1000:g} seconds.")
+        return redirect(url_for("admin_relay_settings"))
 
     return render_template(
         "admin_relay_settings.html", active_page="relay_settings",
         hold_seconds=relay_settings.get_hold_ms() / 1000,
-        message=message, error=error,
     )
 
 
